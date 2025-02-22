@@ -2,7 +2,7 @@ import { FormData } from "@/types/form"
 
 export const generateTestData = (): FormData => ({
   basicInformation: {
-    leadId: "TEST-" + Math.floor(Math.random() * 10000),
+    leadId: Math.floor(Math.random() * 10000).toString(),
     firstName: "John",
     lastName: "Doe",
     email: "john.doe@example.com",
