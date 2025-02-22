@@ -15,6 +15,7 @@ import DependentsInformation from "./form-sections/dependents-information"
 import BillingInformation from "./form-sections/billing-information"
 import AgentInformation from "./form-sections/agent-information"
 import { submitToAirtable } from "@/lib/airtable"
+import { generateTestData } from "@/lib/test-data"
 import { toast } from "sonner"
 import { FormData } from "@/types/form"
 
@@ -42,6 +43,12 @@ export default function InsuranceForm() {
     }
   }
 
+  const handleLoadTestData = () => {
+    const testData = generateTestData()
+    methods.reset(testData)
+    toast.success("Test data loaded successfully!")
+  }
+
   const tabs = [
     { id: "basicInformation", label: "Basic Info" },
     { id: "healthInformation", label: "Health" },
@@ -59,7 +66,15 @@ export default function InsuranceForm() {
   return (
     <FormProvider {...methods}>
       <form onSubmit={methods.handleSubmit(handleSubmit)} className="space-y-8">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between items-center mb-4">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleLoadTestData}
+            className="border-primary text-primary hover:bg-primary hover:text-white"
+          >
+            Load Test Data
+          </Button>
           <Button
             type="submit"
             className="bg-primary hover:bg-primary/90"
