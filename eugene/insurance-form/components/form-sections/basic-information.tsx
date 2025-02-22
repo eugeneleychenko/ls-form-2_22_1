@@ -17,9 +17,14 @@ export default function BasicInformation() {
             <FormLabel required>Lead ID *</FormLabel>
             <FormControl>
               <Input
-                type="number"
+                type="text"
+                pattern="[0-9]*"
                 placeholder="Enter Lead ID (Required)"
                 {...field}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');  // Remove non-digits
+                  field.onChange(value);
+                }}
                 className="border-gray-300 focus:border-primary focus:ring-primary"
               />
             </FormControl>
