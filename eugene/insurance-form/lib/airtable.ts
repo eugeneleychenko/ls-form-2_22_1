@@ -1,8 +1,13 @@
 import { FormData } from '@/types/form'
 
-const AIRTABLE_API_KEY = 'pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025'
-const AIRTABLE_BASE_ID = 'appYMEW2CsYkdpQ7c'
-const AIRTABLE_TABLE_ID = 'tblBxPxL2R5AEyZaC'
+// Using environment variables for sensitive information
+const AIRTABLE_API_KEY = process.env.NEXT_PUBLIC_AIRTABLE_API_KEY
+const AIRTABLE_BASE_ID = process.env.NEXT_PUBLIC_AIRTABLE_BASE_ID
+const AIRTABLE_TABLE_ID = process.env.NEXT_PUBLIC_AIRTABLE_TABLE_ID
+
+if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID || !AIRTABLE_TABLE_ID) {
+  throw new Error('Missing required Airtable environment variables')
+}
 
 export const submitToAirtable = async (formData: FormData) => {
   // Map form data to Airtable fields
