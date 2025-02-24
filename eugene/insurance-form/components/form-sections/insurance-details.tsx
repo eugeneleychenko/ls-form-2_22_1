@@ -2,7 +2,7 @@ import { useFormContext, useWatch } from "react-hook-form"
 import { Input } from "@/components/ui/input"
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 
 // Define types for the Airtable response
@@ -66,6 +66,7 @@ interface AddonPlan {
   planName: string;
   planCost: string;
   planNumber: string;
+  provider?: string; // Add provider to identify which American Financial
 }
 
 interface AddonCategory {
@@ -134,6 +135,102 @@ export default function InsuranceDetails() {
     }
   }, [selectedPlan]);
 
+  // Memoize the fetchAddonData function to prevent it from causing infinite loops
+  const fetchAddonData = useCallback(async () => {
+    if (!selectedType) return;
+    
+    setLoadingAddons(true);
+    console.log("Fetching add-ons for type:", selectedType);
+    
+    try {
+      // Use the same endpoint as in addon.js to fetch addons directly
+      const baseId = 'appYMEW2CsYkdpQ7c';
+      const tableName = 'tbl2WlsDz9rPXhVVY'; // Use the main table instead of Commissions2
+      const endpoint = `https://api.airtable.com/v0/${baseId}/${tableName}`;
+
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025`
+        }
+      });
+
+      const data = await response.json();
+      
+      console.log("Raw data received:", data.records.length, "records");
+      
+      // Filter records to find American Financial addons for the selected type
+      const addonRecords = data.records.filter((record: AirtableRecord) => {
+        return record.fields.Type === selectedType && 
+               record.fields.Carriers && 
+               record.fields.Carriers.includes('American Financial');
+      });
+      
+      console.log("Addon records found for type", selectedType, ":", addonRecords.length);
+      
+      if (addonRecords.length > 0) {
+        const addons: AddonPlan[] = [];
+        
+        // Process each addon record
+        addonRecords.forEach((record: AirtableRecord) => {
+          const carrier = record.fields.Carriers;
+          let provider = carrier; // Use the full carrier name as provider
+          
+          // Extract addon number from carrier name (e.g., "American Financial 1")
+          let addonNumber = '1';
+          if (carrier.includes(' 1')) addonNumber = '1';
+          if (carrier.includes(' 2')) addonNumber = '2';
+          if (carrier.includes(' 3')) addonNumber = '3';
+          
+          // Process each plan in the record
+          for (let i = 1; i <= 3; i++) { // Process up to 3 plans per addon
+            const planKey = `Plan ${i}`;
+            const planCostKey = `Plan ${i} Cost`;
+            
+            if (record.fields[planKey] && record.fields[planCostKey]) {
+              // Clean up the plan name and cost
+              const planName = String(record.fields[planKey]).replace(/\s+/g, ' ').trim();
+              const planCost = String(record.fields[planCostKey]).replace(/\$+/g, '').trim();
+              
+              if (planName && planCost) {
+                addons.push({
+                  planName: planName,
+                  planCost: planCost,
+                  planNumber: i.toString(),
+                  provider: provider
+                });
+              }
+            }
+          }
+        });
+        
+        console.log("Processed addons:", addons.length);
+        
+        // Group addons by provider for better organization
+        const addonsByProvider = {
+          "American Financial 1": addons.filter(a => a.provider === "American Financial 1"),
+          "American Financial 2": addons.filter(a => a.provider === "American Financial 2"),
+          "American Financial 3": addons.filter(a => a.provider === "American Financial 3")
+        };
+        
+        console.log("Addons by provider:", {
+          "AF1": addonsByProvider["American Financial 1"].length,
+          "AF2": addonsByProvider["American Financial 2"].length,
+          "AF3": addonsByProvider["American Financial 3"].length
+        });
+        
+        setAvailableAddons(addons);
+      } else {
+        setAvailableAddons([]);
+      }
+    } catch (error) {
+      console.error('Error fetching addon data:', error);
+      setAvailableAddons([]);
+    } finally {
+      setLoadingAddons(false);
+    }
+  }, [selectedType]); // Only depend on selectedType
+
+  // Initial data fetch - only run once
   useEffect(() => {
     const fetchCarriersAndPlans = async () => {
       try {
@@ -149,6 +246,8 @@ export default function InsuranceDetails() {
 
         const data: AirtableResponse = await response.json();
         
+        console.log("Raw data from Airtable:", data.records.length, "records");
+        
         // Process the data to organize by type
         const dataByType: Record<string, CarrierData> = {};
         
@@ -156,8 +255,21 @@ export default function InsuranceDetails() {
           const type = record.fields.Type;
           const carrier = record.fields.Carriers;
           
-          // Skip records that don't have a proper carrier name or might be add-ons
-          if (!carrier || carrier.toLowerCase().includes('addon')) {
+          // Set hasAddons at the type level for any record with add-ons first, before filtering
+          if (record.fields["Addons?"]) {
+            if (!dataByType[type]) {
+              dataByType[type] = {
+                carriers: [],
+                hasAddons: false,
+                plans: {}
+              };
+            }
+            dataByType[type].hasAddons = true;
+            console.log("Found add-ons for type:", type, "with carrier:", carrier);
+          }
+          
+          // Skip records that are American Financial addons
+          if (!carrier || carrier.toLowerCase().includes('american financial')) {
             return;
           }
           
@@ -169,11 +281,6 @@ export default function InsuranceDetails() {
             };
           }
           
-          // Set hasAddons at the type level if any record has add-ons
-          if (record.fields["Addons?"]) {
-            dataByType[type].hasAddons = true;
-          }
-          
           if (!dataByType[type].carriers.includes(carrier)) {
             dataByType[type].carriers.push(carrier);
             dataByType[type].plans[carrier] = {
@@ -183,24 +290,32 @@ export default function InsuranceDetails() {
           }
           
           // Add plans for this carrier if they exist
-          if (carrier) {
-            for (let i = 1; i <= 8; i++) {
-              const planKey = `Plan ${i}`;
-              const planCostKey = `Plan ${i} Cost`;
+          for (let i = 1; i <= 8; i++) {
+            const planKey = `Plan ${i}`;
+            const planCostKey = `Plan ${i} Cost`;
+            
+            if (record.fields[planKey] && record.fields[planCostKey]) {
+              const planName = String(record.fields[planKey]).trim();
+              const planCost = String(record.fields[planCostKey]).trim();
               
-              if (record.fields[planKey] && typeof record.fields[planKey] === 'string') {
-                const planName = record.fields[planKey] as string;
-                const planCost = record.fields[planCostKey] as string;
-                
-                // Only add if the plan starts with the carrier name to ensure it belongs to this carrier
-                if (planName.startsWith(carrier)) {
-                  if (!dataByType[type].plans[carrier].planNames.includes(planName)) {
-                    dataByType[type].plans[carrier].planNames.push(planName);
-                    dataByType[type].plans[carrier].planCosts.push(planCost);
-                  }
+              // Only add if we have both a plan name and cost
+              if (planName && planCost) {
+                if (!dataByType[type].plans[carrier].planNames.includes(planName)) {
+                  dataByType[type].plans[carrier].planNames.push(planName);
+                  dataByType[type].plans[carrier].planCosts.push(planCost);
                 }
               }
             }
+          }
+        });
+        
+        // Mark types that have American Financial addons
+        data.records.forEach(record => {
+          const type = record.fields.Type;
+          const carrier = record.fields.Carriers;
+          
+          if (carrier && carrier.includes('American Financial') && dataByType[type]) {
+            dataByType[type].hasAddons = true;
           }
         });
         
@@ -225,24 +340,8 @@ export default function InsuranceDetails() {
           }
         }
         
+        console.log("Processed data by type:", Object.keys(dataByType));
         setAllData(dataByType);
-        
-        // If a type is already selected, set the carriers for that type
-        if (selectedType && dataByType[selectedType]) {
-          setCarriers(dataByType[selectedType].carriers);
-          
-          // If a carrier is already selected, set the plans for that carrier
-          if (selectedCarrier && dataByType[selectedType].plans[selectedCarrier]) {
-            setAvailablePlans(dataByType[selectedType].plans[selectedCarrier].planNames);
-            
-            // Create a mapping of plan names to costs
-            const costMap: Record<string, string> = {};
-            dataByType[selectedType].plans[selectedCarrier].planNames.forEach((plan, index) => {
-              costMap[plan] = dataByType[selectedType].plans[selectedCarrier].planCosts[index];
-            });
-            setPlanCosts(costMap);
-          }
-        }
       } catch (error) {
         console.error('Error fetching data:', error);
         // Fallback to empty arrays if API fails
@@ -255,127 +354,14 @@ export default function InsuranceDetails() {
     };
 
     fetchCarriersAndPlans();
-  }, []);
-
-  const fetchAddonData = async () => {
-    if (!selectedType) return;
-    
-    setLoadingAddons(true);
-    console.log("Fetching add-ons for type:", selectedType);
-    
-    try {
-      const baseId = 'appYMEW2CsYkdpQ7c';
-      const tableName = 'tblFJVvuZ2CfhD77D'; // Commissions2 table
-      const endpoint = `https://api.airtable.com/v0/${baseId}/${tableName}?maxRecords=20`;
-
-      const response = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025`
-        }
-      });
-
-      const data: CommissionsResponse = await response.json();
-      
-      console.log("Add-ons data received:", data.records.length, "records");
-      
-      // Filter records with addon data
-      const recordsWithAddons = data.records.filter(record => {
-        const keys = Object.keys(record.fields);
-        return keys.some(key => 
-          key.toLowerCase().includes('addon') && 
-          Array.isArray(record.fields[key]) && 
-          record.fields[key].length > 0
-        );
-      });
-      
-      console.log("Records with add-ons:", recordsWithAddons.length);
-      
-      if (recordsWithAddons.length > 0) {
-        // Take the first record with addons
-        const record = recordsWithAddons[0];
-        
-        // Extract addon categories
-        const extractAddonCategory = (categoryName: string): AddonCategory | undefined => {
-          const fields = record.fields;
-          
-          if (!fields[categoryName] || !Array.isArray(fields[categoryName]) || fields[categoryName].length === 0) {
-            return undefined;
-          }
-          
-          // Find all plan fields for this category
-          const planFields = Object.keys(fields).filter(key => 
-            key.startsWith(categoryName + ' Plan') && 
-            !key.toLowerCase().includes('cost') &&
-            Array.isArray(fields[key]) && 
-            fields[key].length > 0
-          );
-          
-          // Find all cost fields for this category
-          const costFields = Object.keys(fields).filter(key => 
-            key.startsWith(categoryName + ' Plan') && 
-            key.toLowerCase().includes('cost') &&
-            Array.isArray(fields[key]) && 
-            fields[key].length > 0
-          );
-          
-          // Extract plans with their costs
-          const plans = planFields.map((planField, index) => {
-            const planNumber = planField.match(/Plan (\d+)/);
-            const planNum = planNumber ? planNumber[1] : (index + 1).toString();
-            
-            // Find the corresponding cost field
-            const costField = costFields.find(field => field.includes(`Plan ${planNum} Cost`));
-            
-            return {
-              planName: fields[planField][0],
-              planCost: costField ? fields[costField][0] : "0",
-              planNumber: planNum
-            };
-          });
-          
-          return {
-            linkedRecordIds: fields[categoryName],
-            plans
-          };
-        };
-        
-        const addonData: AddonData = {
-          individual: extractAddonCategory('Individual Addons'),
-          family: extractAddonCategory('Family Addons'),
-          individualSpouse: extractAddonCategory('Individual + Spouse Addons'),
-          individualChildren: extractAddonCategory('Individual + Children Addons')
-        };
-        
-        setAddonData(addonData);
-        
-        // Based on selectedType, set available addons
-        if (selectedType) {
-          let addons: AddonPlan[] = [];
-          
-          if (selectedType === 'Individual' && addonData.individual) {
-            addons = addonData.individual.plans;
-          } else if (selectedType === 'Family' && addonData.family) {
-            addons = addonData.family.plans;
-          } else if (selectedType === 'Individual + Spouse' && addonData.individualSpouse) {
-            addons = addonData.individualSpouse.plans;
-          } else if (selectedType === 'Individual + Children' && addonData.individualChildren) {
-            addons = addonData.individualChildren.plans;
-          }
-          
-          setAvailableAddons(addons);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching addon data:', error);
-      setAvailableAddons([]);
-    } finally {
-      setLoadingAddons(false);
-    }
-  };
+  }, []); // Only run once on component mount
 
   // Update carriers when selected type changes
   useEffect(() => {
     if (selectedType && allData[selectedType]) {
+      console.log("Type changed to:", selectedType);
+      console.log("Available carriers:", allData[selectedType].carriers);
+      
       setCarriers(allData[selectedType].carriers);
       // Clear carrier and plan selection when type changes
       setValue("insuranceDetails.carrierU65", "");
@@ -391,6 +377,7 @@ export default function InsuranceDetails() {
       
       // Check if this type has add-ons and fetch them
       const hasAddons = allData[selectedType]?.hasAddons || false;
+      console.log("Type", selectedType, "has add-ons:", hasAddons);
       if (hasAddons) {
         console.log("Type has add-ons, fetching them...");
         fetchAddonData();
@@ -398,12 +385,13 @@ export default function InsuranceDetails() {
     } else {
       setCarriers([]);
     }
-  }, [selectedType, allData, setValue]);
+  }, [selectedType, allData, setValue, fetchAddonData]);
 
-  // Update plans when selected carrier changes
+  // Update plans when selected carrier changes - separate from type changes
   useEffect(() => {
     if (selectedType && selectedCarrier && allData[selectedType]?.plans[selectedCarrier]) {
       console.log("Setting up plans for carrier:", selectedCarrier);
+      console.log("Available plans:", allData[selectedType].plans[selectedCarrier].planNames);
       
       setAvailablePlans(allData[selectedType].plans[selectedCarrier].planNames);
       
@@ -417,7 +405,8 @@ export default function InsuranceDetails() {
       // Clear plan selection when carrier changes
       setValue("insuranceDetails.plan", "");
       setValue("insuranceDetails.planCost", "");
-    } else {
+    } else if (selectedCarrier) {
+      // Only clear if carrier is selected but no plans are found
       setAvailablePlans([]);
       setPlanCosts({});
     }
@@ -425,7 +414,12 @@ export default function InsuranceDetails() {
 
   // Update plan cost when plan changes
   const handlePlanChange = (planName: string) => {
+    console.log("Plan selected:", planName);
+    console.log("Available plan costs:", planCosts);
+    
     const cost = planCosts[planName] || "";
+    console.log("Setting plan cost to:", cost);
+    
     setValue("insuranceDetails.planCost", cost);
   };
   
@@ -489,8 +483,11 @@ export default function InsuranceDetails() {
             <FormLabel>Carrier U65</FormLabel>
             <FormControl>
               <Select 
-                onValueChange={field.onChange} 
-                defaultValue={field.value}
+                onValueChange={(value) => {
+                  console.log("Carrier selected:", value);
+                  field.onChange(value);
+                }} 
+                value={field.value}
                 disabled={!selectedType || carriers.length === 0}
               >
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
@@ -585,7 +582,8 @@ export default function InsuranceDetails() {
       {/* Add-ons Section */}
       {console.log("Add-ons section condition:", {
         selectedType,
-        hasAddons: selectedType ? allData[selectedType]?.hasAddons : false
+        hasAddons: selectedType ? allData[selectedType]?.hasAddons : false,
+        availableAddons: availableAddons.length
       })}
       
       {selectedType && 
@@ -631,27 +629,93 @@ export default function InsuranceDetails() {
               ) : availableAddons.length === 0 ? (
                 <div>No add-ons available for this plan</div>
               ) : (
-                <div className="space-y-3">
-                  {availableAddons.map((addon) => (
-                    <div key={addon.planName} className="flex items-center space-x-2 border-b pb-2">
-                      <Checkbox 
-                        id={`addon-${addon.planNumber}`}
-                        checked={selectedAddons.includes(addon.planName)}
-                        onCheckedChange={(checked) => 
-                          handleAddonSelection(addon.planName, checked === true)
-                        }
-                      />
-                      <div className="space-y-1">
-                        <label 
-                          htmlFor={`addon-${addon.planNumber}`} 
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {addon.planName}
-                        </label>
-                        <p className="text-xs text-gray-500">Cost: {addon.planCost}</p>
-                      </div>
+                <div className="space-y-6">
+                  {/* American Financial 1 - AD&D Add-ons */}
+                  {availableAddons.some(addon => addon.provider === "American Financial 1") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">American Financial 1 - Accidental Death & Dismemberment</h5>
+                      {availableAddons
+                        .filter(addon => addon.provider === "American Financial 1")
+                        .map((addon, index) => (
+                          <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                            <Checkbox 
+                              id={`addon-${addon.provider}-${index}`}
+                              checked={selectedAddons.includes(addon.planName)}
+                              onCheckedChange={(checked) => 
+                                handleAddonSelection(addon.planName, checked === true)
+                              }
+                            />
+                            <div className="space-y-1">
+                              <label 
+                                htmlFor={`addon-${addon.provider}-${index}`} 
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {addon.planName}
+                              </label>
+                              <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                            </div>
+                          </div>
+                        ))}
                     </div>
-                  ))}
+                  )}
+                  
+                  {/* American Financial 2 - AME Add-ons */}
+                  {availableAddons.some(addon => addon.provider === "American Financial 2") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">American Financial 2 - Accident Medical Expense</h5>
+                      {availableAddons
+                        .filter(addon => addon.provider === "American Financial 2")
+                        .map((addon, index) => (
+                          <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                            <Checkbox 
+                              id={`addon-${addon.provider}-${index}`}
+                              checked={selectedAddons.includes(addon.planName)}
+                              onCheckedChange={(checked) => 
+                                handleAddonSelection(addon.planName, checked === true)
+                              }
+                            />
+                            <div className="space-y-1">
+                              <label 
+                                htmlFor={`addon-${addon.provider}-${index}`} 
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {addon.planName}
+                              </label>
+                              <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                  
+                  {/* American Financial 3 - Critical Illness Add-ons */}
+                  {availableAddons.some(addon => addon.provider === "American Financial 3") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">American Financial 3 - Critical Illness</h5>
+                      {availableAddons
+                        .filter(addon => addon.provider === "American Financial 3")
+                        .map((addon, index) => (
+                          <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                            <Checkbox 
+                              id={`addon-${addon.provider}-${index}`}
+                              checked={selectedAddons.includes(addon.planName)}
+                              onCheckedChange={(checked) => 
+                                handleAddonSelection(addon.planName, checked === true)
+                              }
+                            />
+                            <div className="space-y-1">
+                              <label 
+                                htmlFor={`addon-${addon.provider}-${index}`} 
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                              >
+                                {addon.planName}
+                              </label>
+                              <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                   
                   <FormField
                     control={control}
