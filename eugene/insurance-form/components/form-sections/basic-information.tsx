@@ -3,9 +3,55 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form"
 import { FormLabel } from "@/components/ui/form-label"
+import { useEffect, useState } from "react"
+
+// Define types for the Airtable response
+interface AirtableRecord {
+  id: string;
+  fields: {
+    Type: string;
+    [key: string]: any;
+  };
+}
+
+interface AirtableResponse {
+  records: AirtableRecord[];
+}
 
 export default function BasicInformation() {
   const { control } = useFormContext()
+  const [insuranceTypes, setInsuranceTypes] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInsuranceTypes = async () => {
+      try {
+        const baseId = 'appYMEW2CsYkdpQ7c';
+        const tableName = 'tbl2WlsDz9rPXhVVY';
+        const endpoint = `https://api.airtable.com/v0/${baseId}/${tableName}`;
+
+        const response = await fetch(endpoint, {
+          headers: {
+            Authorization: `Bearer pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025`
+          }
+        });
+
+        const data: AirtableResponse = await response.json();
+        
+        // Extract unique types from the data
+        const types = [...new Set(data.records.map(record => record.fields.Type))];
+        setInsuranceTypes(types);
+      } catch (error) {
+        console.error('Error fetching insurance types:', error);
+        // Fallback to default values if API fails
+        setInsuranceTypes(['Health', 'Life', 'Auto', 'Home']);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInsuranceTypes();
+  }, []);
 
   return (
     <div className="grid gap-6">
@@ -150,14 +196,17 @@ export default function BasicInformation() {
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
-                  <SelectValue placeholder="Select Type of Insurance (Optional)" />
+                  <SelectValue placeholder={loading ? "Loading..." : "Select Type of Insurance (Optional)"} />
                 </SelectTrigger>
               </FormControl>
               <SelectContent>
-                <SelectItem value="health">Health</SelectItem>
-                <SelectItem value="life">Life</SelectItem>
-                <SelectItem value="auto">Auto</SelectItem>
-                <SelectItem value="home">Home</SelectItem>
+                {loading ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  insuranceTypes.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             <FormMessage className="text-destructive" />

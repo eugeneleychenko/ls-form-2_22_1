@@ -12,12 +12,13 @@ export default function Home() {
         }}
       />
       <div className="container mx-auto space-y-6 p-4 relative">
-        <div className="flex justify-center mb-8">
-          <div className="w-[300px] h-[100px] relative">
+        <div className="flex justify-center mb-8 pt-8">
+          <div className="image-container">
             <Image
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-DbW5A7kTi1dq2iBJu3Qk8eS3IINMdM.png"
               alt="LeoSource Insurance Agency"
-              fill
+              width={200}
+              height={70}
               className="object-contain"
               priority
             />
