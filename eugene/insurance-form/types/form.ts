@@ -20,9 +20,13 @@ export interface FormData {
   insuranceDetails?: {
     carrierU65?: string;
     plan?: string;
+    planCost?: string;
     carrierACA?: string;
     acaPlanPremium?: string;
     acaPlanDeductible?: string;
+    hasAddons?: boolean;
+    selectedAddons?: string[];
+    addonsCost?: string;
   };
   personalDetails?: {
     ssn?: string;
