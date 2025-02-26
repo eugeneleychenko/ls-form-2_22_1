@@ -18,20 +18,37 @@ function fetchAddons() {
 
     // First pass: identify all records that are addons themselves
     data.records.forEach(record => {
-      // Check if this record is an addon (based on the carrier being American Financial)
-      const isAddon = record.fields.Carriers && record.fields.Carriers.includes('American Financial');
+      // Check if this record is an addon (based on the carrier)
+      const isAddon = record.fields.Carriers && (
+        record.fields.Carriers.includes('American Financial') || 
+        record.fields.Carriers.includes('Essential Care Individual') ||
+        record.fields.Carriers.includes('AMT Addons')
+      );
       
       if (isAddon) {
         // Extract the addon number from the carrier name (e.g., "American Financial 1")
         let addonNumber = '1';
-        if (record.fields.Carriers.includes(' 1')) addonNumber = '1';
-        if (record.fields.Carriers.includes(' 2')) addonNumber = '2';
-        if (record.fields.Carriers.includes(' 3')) addonNumber = '3';
+        let addonType = '';
+        
+        if (record.fields.Carriers.includes('American Financial')) {
+          addonType = 'American Financial';
+          if (record.fields.Carriers.includes(' 1')) addonNumber = '1';
+          if (record.fields.Carriers.includes(' 2')) addonNumber = '2';
+          if (record.fields.Carriers.includes(' 3')) addonNumber = '3';
+        } else if (record.fields.Carriers.includes('Essential Care Individual')) {
+          addonType = 'Essential Care';
+          addonNumber = '1';
+        } else if (record.fields.Carriers.includes('AMT Addons')) {
+          addonType = 'AMT';
+          if (record.fields.Carriers.includes(' 1')) addonNumber = '1';
+          if (record.fields.Carriers.includes(' 2')) addonNumber = '2';
+        }
         
         allAddons.push({
           id: record.id,
           name: record.fields.Carriers,
           addonNumber: addonNumber,
+          addonType: addonType,
           type: record.fields.Type || 'Unknown Type',
           plans: []
         });
@@ -153,6 +170,40 @@ function fetchAddons() {
       uniquePlans.forEach(plan => {
         console.log(`    - ${plan.name}: $${plan.cost}`);
       });
+    }
+    
+    // Add a section to display addons by carrier type
+    console.log('\n=== ADDONS BY CARRIER ===');
+    
+    // Group addons by carrier type
+    const addonsByCarrier = {
+      'American Financial': [],
+      'Essential Care': [],
+      'AMT': []
+    };
+    
+    allAddons.forEach(addon => {
+      if (addon.addonType && addonsByCarrier[addon.addonType]) {
+        addonsByCarrier[addon.addonType].push(addon);
+      }
+    });
+    
+    // Display addons by carrier
+    for (const [carrier, addons] of Object.entries(addonsByCarrier)) {
+      if (addons.length > 0) {
+        console.log(`\n${carrier} (${addons.length} addons):`);
+        
+        // Sort addons by their number
+        addons.sort((a, b) => a.addonNumber - b.addonNumber);
+        
+        addons.forEach(addon => {
+          console.log(`  ${addon.name}:`);
+          
+          addon.plans.forEach(plan => {
+            console.log(`    - ${plan.name}: $${plan.cost}`);
+          });
+        });
+      }
     }
   })
   .catch(error => {

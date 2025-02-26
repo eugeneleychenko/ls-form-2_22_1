@@ -1,9 +1,11 @@
 import { useFormContext, useWatch } from "react-hook-form"
 import { Input } from "@/components/ui/input"
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form"
+import { FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useEffect, useState, useCallback } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Switch } from "@/components/ui/switch"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 // Define types for the Airtable response
 interface AirtableRecord {
@@ -13,20 +15,28 @@ interface AirtableRecord {
     Carriers: string;
     "Plan 1"?: string;
     "Plan 1 Cost"?: string;
+    "Plan 1 Commission"?: string;
     "Plan 2"?: string;
     "Plan 2 Cost"?: string;
+    "Plan 2 Commission"?: string;
     "Plan 3"?: string;
     "Plan 3 Cost"?: string;
+    "Plan 3 Commission"?: string;
     "Plan 4"?: string;
     "Plan 4 Cost"?: string;
+    "Plan 4 Commission"?: string;
     "Plan 5"?: string;
     "Plan 5 Cost"?: string;
+    "Plan 5 Commission"?: string;
     "Plan 6"?: string;
     "Plan 6 Cost"?: string;
+    "Plan 6 Commission"?: string;
     "Plan 7"?: string;
     "Plan 7 Cost"?: string;
+    "Plan 7 Commission"?: string;
     "Plan 8"?: string;
     "Plan 8 Cost"?: string;
+    "Plan 8 Commission"?: string;
     "Addons?"?: boolean;
     [key: string]: any;
   };
@@ -58,6 +68,7 @@ interface CarrierData {
     [carrier: string]: {
       planNames: string[];
       planCosts: string[];
+      planCommissions: string[];
     }
   };
 }
@@ -65,8 +76,10 @@ interface CarrierData {
 interface AddonPlan {
   planName: string;
   planCost: string;
+  planCommission: string;
   planNumber: string;
   provider?: string; // Add provider to identify which American Financial
+  addonType: string;
 }
 
 interface AddonCategory {
@@ -97,10 +110,21 @@ export default function InsuranceDetails() {
   const [selectedAddons, setSelectedAddons] = useState<string[]>([])
   const [addonsTotalCost, setAddonsTotalCost] = useState<string>("0")
   
+  // [X] Commission states
+  const [planCommission, setPlanCommission] = useState<string>("0")
+  const [planCommissions, setPlanCommissions] = useState<Record<string, string>>({})
+  const [addonCommissions, setAddonCommissions] = useState<Record<string, string>>({})
+  const [addonsTotalCommission, setAddonsTotalCommission] = useState<string>("0")
+  const [totalCommission, setTotalCommission] = useState<string>("0")
+  
+  // State for insurance types
+  const [insuranceTypes, setInsuranceTypes] = useState<string[]>([])
+  const [loadingTypes, setLoadingTypes] = useState(true)
+  
   // Watch for changes to the type of insurance and carrier
   const selectedType = useWatch({
     control,
-    name: "basicInformation.typeOfInsurance",
+    name: "insuranceDetails.typeOfInsurance",
     defaultValue: ""
   });
 
@@ -158,11 +182,13 @@ export default function InsuranceDetails() {
       
       console.log("Raw data received:", data.records.length, "records");
       
-      // Filter records to find American Financial addons for the selected type
+      // Filter records to find addons for the selected type
       const addonRecords = data.records.filter((record: AirtableRecord) => {
         return record.fields.Type === selectedType && 
                record.fields.Carriers && 
-               record.fields.Carriers.includes('American Financial');
+               (record.fields.Carriers.includes('American Financial') || 
+                record.fields.Carriers.includes('Essential Care Individual') ||
+                record.fields.Carriers.includes('AMT Addons'));
       });
       
       console.log("Addon records found for type", selectedType, ":", addonRecords.length);
@@ -174,29 +200,47 @@ export default function InsuranceDetails() {
         addonRecords.forEach((record: AirtableRecord) => {
           const carrier = record.fields.Carriers;
           let provider = carrier; // Use the full carrier name as provider
+          let addonType = '';
           
-          // Extract addon number from carrier name (e.g., "American Financial 1")
+          // Extract addon number and type based on carrier name
           let addonNumber = '1';
-          if (carrier.includes(' 1')) addonNumber = '1';
-          if (carrier.includes(' 2')) addonNumber = '2';
-          if (carrier.includes(' 3')) addonNumber = '3';
+          
+          if (carrier.includes('American Financial')) {
+            addonType = 'American Financial';
+            if (carrier.includes(' 1')) addonNumber = '1';
+            if (carrier.includes(' 2')) addonNumber = '2';
+            if (carrier.includes(' 3')) addonNumber = '3';
+          } else if (carrier.includes('Essential Care Individual')) {
+            addonType = 'Essential Care';
+            addonNumber = '1';
+          } else if (carrier.includes('AMT Addons')) {
+            addonType = 'AMT';
+            if (carrier.includes(' 1')) addonNumber = '1';
+            if (carrier.includes(' 2')) addonNumber = '2';
+          }
           
           // Process each plan in the record
           for (let i = 1; i <= 3; i++) { // Process up to 3 plans per addon
             const planKey = `Plan ${i}`;
             const planCostKey = `Plan ${i} Cost`;
+            const planCommissionKey = `Plan ${i} Commission`;
             
             if (record.fields[planKey] && record.fields[planCostKey]) {
               // Clean up the plan name and cost
               const planName = String(record.fields[planKey]).replace(/\s+/g, ' ').trim();
               const planCost = String(record.fields[planCostKey]).replace(/\$+/g, '').trim();
+              const planCommission = record.fields[planCommissionKey] 
+                ? String(record.fields[planCommissionKey]).replace(/\$+/g, '').trim() 
+                : "0";
               
               if (planName && planCost) {
                 addons.push({
                   planName: planName,
                   planCost: planCost,
+                  planCommission: planCommission,
                   planNumber: i.toString(),
-                  provider: provider
+                  provider: provider,
+                  addonType: addonType
                 });
               }
             }
@@ -209,13 +253,19 @@ export default function InsuranceDetails() {
         const addonsByProvider = {
           "American Financial 1": addons.filter(a => a.provider === "American Financial 1"),
           "American Financial 2": addons.filter(a => a.provider === "American Financial 2"),
-          "American Financial 3": addons.filter(a => a.provider === "American Financial 3")
+          "American Financial 3": addons.filter(a => a.provider === "American Financial 3"),
+          "Essential Care Individual": addons.filter(a => a.provider === "Essential Care Individual"),
+          "AMT Addons 1": addons.filter(a => a.provider === "AMT Addons 1"),
+          "AMT Addons 2": addons.filter(a => a.provider === "AMT Addons 2")
         };
         
         console.log("Addons by provider:", {
           "AF1": addonsByProvider["American Financial 1"].length,
           "AF2": addonsByProvider["American Financial 2"].length,
-          "AF3": addonsByProvider["American Financial 3"].length
+          "AF3": addonsByProvider["American Financial 3"].length,
+          "Essential Care": addonsByProvider["Essential Care Individual"].length,
+          "AMT1": addonsByProvider["AMT Addons 1"].length,
+          "AMT2": addonsByProvider["AMT Addons 2"].length
         });
         
         setAvailableAddons(addons);
@@ -268,8 +318,11 @@ export default function InsuranceDetails() {
             console.log("Found add-ons for type:", type, "with carrier:", carrier);
           }
           
-          // Skip records that are American Financial addons
-          if (!carrier || carrier.toLowerCase().includes('american financial')) {
+          // Skip records that are add-ons (American Financial, Essential Care Individual, or AMT Addons)
+          if (!carrier || 
+              carrier.toLowerCase().includes('american financial') || 
+              carrier.toLowerCase().includes('essential care individual') || 
+              carrier.toLowerCase().includes('amt addons')) {
             return;
           }
           
@@ -285,7 +338,8 @@ export default function InsuranceDetails() {
             dataByType[type].carriers.push(carrier);
             dataByType[type].plans[carrier] = {
               planNames: [],
-              planCosts: []
+              planCosts: [],
+              planCommissions: []
             };
           }
           
@@ -293,16 +347,21 @@ export default function InsuranceDetails() {
           for (let i = 1; i <= 8; i++) {
             const planKey = `Plan ${i}`;
             const planCostKey = `Plan ${i} Cost`;
+            const planCommissionKey = `Plan ${i} Commission`;
             
             if (record.fields[planKey] && record.fields[planCostKey]) {
               const planName = String(record.fields[planKey]).trim();
               const planCost = String(record.fields[planCostKey]).trim();
+              const planCommission = record.fields[planCommissionKey] 
+                ? String(record.fields[planCommissionKey]).trim() 
+                : "0";
               
               // Only add if we have both a plan name and cost
               if (planName && planCost) {
                 if (!dataByType[type].plans[carrier].planNames.includes(planName)) {
                   dataByType[type].plans[carrier].planNames.push(planName);
                   dataByType[type].plans[carrier].planCosts.push(planCost);
+                  dataByType[type].plans[carrier].planCommissions.push(planCommission);
                 }
               }
             }
@@ -367,13 +426,20 @@ export default function InsuranceDetails() {
       setValue("insuranceDetails.carrierU65", "");
       setValue("insuranceDetails.plan", "");
       setValue("insuranceDetails.planCost", "");
+      setValue("insuranceDetails.planCommission", ""); // [X] Clear plan commission
+      setValue("insuranceDetails.commissionRate", ""); // Add commission rate field
       setValue("insuranceDetails.hasAddons", false);
       setValue("insuranceDetails.selectedAddons", []);
       setValue("insuranceDetails.addonsCost", "");
+      setValue("insuranceDetails.addonsCommission", ""); // [X] Clear addons commission
+      setValue("insuranceDetails.totalCommission", "0"); // [X] Clear total commission
       setAvailablePlans([]);
       setAddonsEnabled(false);
       setSelectedAddons([]);
       setAddonsTotalCost("0");
+      setAddonsTotalCommission("0"); // [X] Reset addon commission
+      setPlanCommission("0"); // [X] Reset plan commission
+      setTotalCommission("0"); // [X] Reset total commission
       
       // Check if this type has add-ons and fetch them
       const hasAddons = allData[selectedType]?.hasAddons || false;
@@ -395,32 +461,110 @@ export default function InsuranceDetails() {
       
       setAvailablePlans(allData[selectedType].plans[selectedCarrier].planNames);
       
-      // Create a mapping of plan names to costs
+      // Create a mapping of plan names to costs and commissions
       const costMap: Record<string, string> = {};
+      const commissionMap: Record<string, string> = {}; // [X] Added commission mapping
+      
       allData[selectedType].plans[selectedCarrier].planNames.forEach((plan, index) => {
-        costMap[plan] = allData[selectedType].plans[selectedCarrier].planCosts[index];
+        // Ensure cost is a string and properly formatted
+        const rawCost = allData[selectedType].plans[selectedCarrier].planCosts[index];
+        const costStr = typeof rawCost === 'object' ? 
+          JSON.stringify(rawCost) : 
+          (typeof rawCost === 'string' ? rawCost : String(rawCost));
+        
+        // Clean up the cost string to ensure it's just a number or formatted currency
+        const cleanCost = costStr.replace(/[^0-9.]/g, '');
+        costMap[plan] = cleanCost ? `$${cleanCost}` : "0";
+        
+        // Handle commission similarly
+        const rawCommission = allData[selectedType].plans[selectedCarrier].planCommissions[index];
+        const commissionStr = typeof rawCommission === 'object' ? 
+          JSON.stringify(rawCommission) : 
+          (typeof rawCommission === 'string' ? rawCommission : String(rawCommission || "0"));
+        
+        commissionMap[plan] = commissionStr.replace(/[^0-9.]/g, ''); // [X] Map commissions
       });
+      
+      console.log("Processed cost map:", costMap);
+      console.log("Processed commission map:", commissionMap);
+      
       setPlanCosts(costMap);
+      setPlanCommissions(commissionMap); // [X] Set commission mapping
       
       // Clear plan selection when carrier changes
       setValue("insuranceDetails.plan", "");
       setValue("insuranceDetails.planCost", "");
+      setValue("insuranceDetails.planCommission", ""); // [X] Clear plan commission
     } else if (selectedCarrier) {
       // Only clear if carrier is selected but no plans are found
       setAvailablePlans([]);
       setPlanCosts({});
+      setPlanCommissions({}); // [X] Clear commission mapping
     }
   }, [selectedCarrier, selectedType, allData, setValue]);
 
-  // Update plan cost when plan changes
+  // Update plan cost and commission when plan changes
   const handlePlanChange = (planName: string) => {
     console.log("Plan selected:", planName);
     console.log("Available plan costs:", planCosts);
+    console.log("Available plan commissions:", planCommissions); // [X] Log commissions
     
     const cost = planCosts[planName] || "";
-    console.log("Setting plan cost to:", cost);
+    let commissionRate = planCommissions[planName] || "0"; // [X] Get commission rate for selected plan
     
-    setValue("insuranceDetails.planCost", cost);
+    // Debug the cost value
+    console.log("Raw cost value:", cost, "Type:", typeof cost);
+    
+    // Calculate commission as rate * cost
+    let calculatedCommission = "0";
+    let displayRate = "0%"; // Initialize displayRate
+    
+    if (cost && commissionRate) {
+      // Ensure cost is a clean number string before parsing
+      const costString = typeof cost === 'string' ? cost.replace(/[^0-9.]/g, '') : String(cost).replace(/[^0-9.]/g, '');
+      const costValue = parseFloat(costString);
+      
+      // Ensure commission rate is a clean number string before parsing
+      const rateString = typeof commissionRate === 'string' ? commissionRate.replace(/[^0-9.]/g, '') : String(commissionRate).replace(/[^0-9.]/g, '');
+      const parsedRate = parseFloat(rateString);
+      
+      // Check if the rate is already a decimal (like 0.2) or a percentage (like 20)
+      let rateValue;
+      
+      if (parsedRate > 0 && parsedRate <= 1) {
+        // Already a decimal percentage (e.g., 0.2 for 20%)
+        rateValue = parsedRate;
+        displayRate = `${(parsedRate * 100).toFixed(1)}%`;
+        console.log("Rate is already a decimal:", parsedRate, "Display as:", displayRate);
+      } else {
+        // Default to 20% if invalid or zero
+        const percentageRate = parsedRate || 20;
+        rateValue = percentageRate / 100; // Convert percentage to decimal
+        displayRate = `${percentageRate}%`;
+        console.log("Converting percentage rate:", percentageRate, "to decimal:", rateValue);
+      }
+      
+      console.log("Parsed cost value:", costValue, "Rate value:", rateValue);
+      
+      if (!isNaN(costValue) && !isNaN(rateValue)) {
+        calculatedCommission = `$${(costValue * rateValue).toFixed(2)}`;
+      }
+    }
+    
+    // Format the cost value for display
+    const formattedCost = cost ? (cost.startsWith('$') ? cost : `$${cost.replace(/[^0-9.]/g, '')}`) : "$0";
+    
+    console.log("Setting plan cost to:", formattedCost);
+    console.log("Commission rate:", commissionRate);
+    console.log("Calculated commission:", calculatedCommission);
+    
+    setValue("insuranceDetails.planCost", formattedCost);
+    setValue("insuranceDetails.commissionRate", displayRate || (commissionRate + "%")); // Store the rate with % symbol
+    setValue("insuranceDetails.planCommission", calculatedCommission); // Set calculated commission value
+    setPlanCommission(calculatedCommission); // Update state
+    
+    // Calculate total commission (plan + addons)
+    calculateTotalCommission(calculatedCommission, selectedAddons); // Calculate total commission
   };
   
   // Handle addon checkbox change
@@ -431,50 +575,275 @@ export default function InsuranceDetails() {
     if (!checked) {
       setSelectedAddons([]);
       setAddonsTotalCost("0");
+      setAddonsTotalCommission("0"); // [X] Reset addon commission
       setValue("insuranceDetails.selectedAddons", []);
       setValue("insuranceDetails.addonsCost", "0");
+      setValue("insuranceDetails.addonsCommission", "0"); // [X] Reset addon commission in form
+      
+      // Recalculate total commission with just the plan commission
+      calculateTotalCommission(planCommission, []); // [X] Update total commission
     }
   };
   
   // Handle addon selection
-  const handleAddonSelection = (addonName: string, checked: boolean) => {
+  const handleAddonSelection = (addonName: string, provider: string) => {
+    // For radio buttons, we need to handle selection differently
+    // We'll maintain an array of selected addons, but ensure only one is selected per provider
     let updatedAddons = [...selectedAddons];
     
-    if (checked) {
-      updatedAddons.push(addonName);
-    } else {
-      updatedAddons = updatedAddons.filter(name => name !== addonName);
-    }
+    // Remove any previously selected addon from the same provider
+    updatedAddons = updatedAddons.filter(name => {
+      const addon = availableAddons.find(a => a.planName === name);
+      return addon?.provider !== provider;
+    });
+    
+    // Add the newly selected addon
+    updatedAddons.push(addonName);
     
     setSelectedAddons(updatedAddons);
     setValue("insuranceDetails.selectedAddons", updatedAddons);
     
-    // Calculate total cost
-    const total = calculateAddonsCost(updatedAddons);
-    setAddonsTotalCost(total);
-    setValue("insuranceDetails.addonsCost", total);
+    // Calculate total cost and commission
+    const { totalCost, totalCommission } = calculateAddonsValues(updatedAddons); // [X] Get both cost and commission
+    setAddonsTotalCost(totalCost);
+    setAddonsTotalCommission(totalCommission); // [X] Set total addon commission
+    
+    setValue("insuranceDetails.addonsCost", totalCost);
+    setValue("insuranceDetails.addonsCommission", totalCommission); // [X] Set form value for addons commission
+    
+    // Calculate overall total commission
+    calculateTotalCommission(planCommission, updatedAddons); // [X] Update total commission
   };
   
-  // Calculate total cost of selected addons
-  const calculateAddonsCost = (selectedAddons: string[]): string => {
-    let total = 0;
+  // Calculate total cost and commission of selected addons
+  const calculateAddonsValues = (selectedAddons: string[]): { totalCost: string, totalCommission: string } => { // [X] Updated return type
+    let totalCost = 0;
+    let totalCommission = 0; // [X] Added commission total
     
     availableAddons.forEach(addon => {
       if (selectedAddons.includes(addon.planName)) {
         // Extract the cost value (remove $ and convert to number)
-        const costString = addon.planCost.replace(/[^0-9.]/g, '');
+        const costString = typeof addon.planCost === 'string' ? 
+          addon.planCost.replace(/[^0-9.]/g, '') : 
+          String(addon.planCost).replace(/[^0-9.]/g, '');
         const cost = parseFloat(costString);
+        
+        // Extract the commission value as a rate
+        const commissionRateString = addon.planCommission ? 
+          (typeof addon.planCommission === 'string' ? 
+            addon.planCommission.replace(/[^0-9.]/g, '') : 
+            String(addon.planCommission).replace(/[^0-9.]/g, '')) : 
+          "0";
+        
+        // Check if the commission is already a calculated value or a percentage rate
+        let commissionValue;
+        
+        // If the commission value is very small (like 0.2) it's likely already a decimal percentage
+        // If it's larger (like 20) it's likely a percentage that needs to be divided by 100
+        const parsedCommission = parseFloat(commissionRateString);
+        
+        if (parsedCommission > 0 && parsedCommission <= 1) {
+          // Already a decimal percentage (e.g., 0.2 for 20%)
+          commissionValue = cost * parsedCommission;
+          console.log(`Addon ${addon.planName}: Cost=${cost}, Rate=${parsedCommission * 100}% (decimal: ${parsedCommission}), Calculated=${commissionValue}`);
+        } else {
+          // Percentage that needs to be converted (e.g., 20 for 20%)
+          const commissionRate = parsedCommission || 20; // Default to 20% if invalid
+          const commissionRateDecimal = commissionRate / 100; // Convert percentage to decimal
+          commissionValue = cost * commissionRateDecimal;
+          console.log(`Addon ${addon.planName}: Cost=${cost}, Rate=${commissionRate}%, Calculated=${commissionValue}`);
+        }
+        
         if (!isNaN(cost)) {
-          total += cost;
+          totalCost += cost;
+          
+          // Add the calculated commission
+          if (!isNaN(commissionValue)) {
+            totalCommission += commissionValue;
+          }
         }
       }
     });
     
-    return `$${total.toFixed(2)}`;
+    return { 
+      totalCost: `$${totalCost.toFixed(2)}`,
+      totalCommission: `$${totalCommission.toFixed(2)}` // [X] Return commission total
+    };
   };
+  
+  // Calculate total cost of selected addons (legacy function kept for compatibility)
+  const calculateAddonsCost = (selectedAddons: string[]): string => {
+    const { totalCost } = calculateAddonsValues(selectedAddons);
+    return totalCost;
+  };
+  
+  // [X] Calculate total commission (plan + addons)
+  const calculateTotalCommission = (planCommissionValue: string, selectedAddons: string[]) => {
+    // Extract plan commission value
+    const planCommissionNumber = parseFloat(planCommissionValue.replace(/[^0-9.]/g, '') || "0");
+    
+    // Get addon commissions
+    const { totalCommission: addonCommissionValue } = calculateAddonsValues(selectedAddons);
+    const addonCommissionNumber = parseFloat(addonCommissionValue.replace(/[^0-9.]/g, '') || "0");
+    
+    // Calculate total
+    const total = planCommissionNumber + addonCommissionNumber;
+    const totalFormatted = `$${total.toFixed(2)}`;
+    
+    setTotalCommission(totalFormatted);
+    setValue("insuranceDetails.totalCommission", totalFormatted);
+  };
+  
+  // Helper function to check if an addon is selected
+  const isAddonSelected = (addonName: string): boolean => {
+    return selectedAddons.includes(addonName);
+  };
+  
+  // Helper function to group addons by type
+  const getAddonsByType = () => {
+    const addonTypes = [
+      { type: 'American Financial', label: 'American Financial', providers: ['American Financial 1', 'American Financial 2', 'American Financial 3'] },
+      { type: 'Essential Care', label: 'Essential Care Individual', providers: ['Essential Care Individual'] },
+      { type: 'AMT', label: 'AMT Addons', providers: ['AMT Addons 1', 'AMT Addons 2'] }
+    ];
+    
+    return addonTypes.filter(typeInfo => 
+      availableAddons.some(addon => addon.addonType === typeInfo.type)
+    );
+  };
+
+  // Fetch insurance types
+  useEffect(() => {
+    const fetchInsuranceTypes = async () => {
+      try {
+        const baseId = 'appYMEW2CsYkdpQ7c';
+        const tableName = 'tbl2WlsDz9rPXhVVY';
+        const endpoint = `https://api.airtable.com/v0/${baseId}/${tableName}`;
+
+        const response = await fetch(endpoint, {
+          headers: {
+            Authorization: `Bearer pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025`
+          }
+        });
+
+        const data: AirtableResponse = await response.json();
+        
+        // Extract unique types from the data
+        const types = [...new Set(data.records.map(record => record.fields.Type))];
+        setInsuranceTypes(types);
+      } catch (error) {
+        console.error('Error fetching insurance types:', error);
+        // Fallback to default values if API fails
+        setInsuranceTypes(['Health', 'Life', 'Auto', 'Home']);
+      } finally {
+        setLoadingTypes(false);
+      }
+    };
+
+    fetchInsuranceTypes();
+  }, []);
 
   return (
     <div className="space-y-4">
+      {/* Insurance State Field */}
+      <FormField
+        control={control}
+        name="insuranceDetails.insuranceState"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Insurance State</FormLabel>
+            <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormControl>
+                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Select Insurance State" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="AL">Alabama</SelectItem>
+                <SelectItem value="AK">Alaska</SelectItem>
+                <SelectItem value="AZ">Arizona</SelectItem>
+                <SelectItem value="AR">Arkansas</SelectItem>
+                <SelectItem value="CA">California</SelectItem>
+                <SelectItem value="CO">Colorado</SelectItem>
+                <SelectItem value="CT">Connecticut</SelectItem>
+                <SelectItem value="DE">Delaware</SelectItem>
+                <SelectItem value="FL">Florida</SelectItem>
+                <SelectItem value="GA">Georgia</SelectItem>
+                <SelectItem value="HI">Hawaii</SelectItem>
+                <SelectItem value="ID">Idaho</SelectItem>
+                <SelectItem value="IL">Illinois</SelectItem>
+                <SelectItem value="IN">Indiana</SelectItem>
+                <SelectItem value="IA">Iowa</SelectItem>
+                <SelectItem value="KS">Kansas</SelectItem>
+                <SelectItem value="KY">Kentucky</SelectItem>
+                <SelectItem value="LA">Louisiana</SelectItem>
+                <SelectItem value="ME">Maine</SelectItem>
+                <SelectItem value="MD">Maryland</SelectItem>
+                <SelectItem value="MA">Massachusetts</SelectItem>
+                <SelectItem value="MI">Michigan</SelectItem>
+                <SelectItem value="MN">Minnesota</SelectItem>
+                <SelectItem value="MS">Mississippi</SelectItem>
+                <SelectItem value="MO">Missouri</SelectItem>
+                <SelectItem value="MT">Montana</SelectItem>
+                <SelectItem value="NE">Nebraska</SelectItem>
+                <SelectItem value="NV">Nevada</SelectItem>
+                <SelectItem value="NH">New Hampshire</SelectItem>
+                <SelectItem value="NJ">New Jersey</SelectItem>
+                <SelectItem value="NM">New Mexico</SelectItem>
+                <SelectItem value="NY">New York</SelectItem>
+                <SelectItem value="NC">North Carolina</SelectItem>
+                <SelectItem value="ND">North Dakota</SelectItem>
+                <SelectItem value="OH">Ohio</SelectItem>
+                <SelectItem value="OK">Oklahoma</SelectItem>
+                <SelectItem value="OR">Oregon</SelectItem>
+                <SelectItem value="PA">Pennsylvania</SelectItem>
+                <SelectItem value="RI">Rhode Island</SelectItem>
+                <SelectItem value="SC">South Carolina</SelectItem>
+                <SelectItem value="SD">South Dakota</SelectItem>
+                <SelectItem value="TN">Tennessee</SelectItem>
+                <SelectItem value="TX">Texas</SelectItem>
+                <SelectItem value="UT">Utah</SelectItem>
+                <SelectItem value="VT">Vermont</SelectItem>
+                <SelectItem value="VA">Virginia</SelectItem>
+                <SelectItem value="WA">Washington</SelectItem>
+                <SelectItem value="WV">West Virginia</SelectItem>
+                <SelectItem value="WI">Wisconsin</SelectItem>
+                <SelectItem value="WY">Wyoming</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
+      {/* Type of Insurance Field */}
+      <FormField
+        control={control}
+        name="insuranceDetails.typeOfInsurance"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Type of Insurance</FormLabel>
+            <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormControl>
+                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder={loadingTypes ? "Loading..." : "Select Type of Insurance"} />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {loadingTypes ? (
+                  <SelectItem value="loading" disabled>Loading...</SelectItem>
+                ) : (
+                  insuranceTypes.map((type) => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
       <FormField
         control={control}
         name="insuranceDetails.carrierU65"
@@ -579,12 +948,42 @@ export default function InsuranceDetails() {
         )}
       />
       
+      {/* Commission Rate Field */}
+      <FormField
+        control={control}
+        name="insuranceDetails.commissionRate"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Commission Rate</FormLabel>
+            <FormControl>
+              <Input {...field} readOnly />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
+      {/* [X] Plan Commission Field */}
+      <FormField
+        control={control}
+        name="insuranceDetails.planCommission"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Plan Commission</FormLabel>
+            <FormControl>
+              <Input {...field} readOnly />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
       {/* Add-ons Section */}
-      {console.log("Add-ons section condition:", {
+      {console.log("Add-ons section condition:", JSON.stringify({
         selectedType,
         hasAddons: selectedType ? allData[selectedType]?.hasAddons : false,
         availableAddons: availableAddons.length
-      })}
+      }))}
       
       {selectedType && 
        allData[selectedType] && 
@@ -634,28 +1033,31 @@ export default function InsuranceDetails() {
                   {availableAddons.some(addon => addon.provider === "American Financial 1") && (
                     <div className="space-y-3">
                       <h5 className="font-medium text-sm border-b pb-1">American Financial 1 - Accidental Death & Dismemberment</h5>
-                      {availableAddons
-                        .filter(addon => addon.provider === "American Financial 1")
-                        .map((addon, index) => (
-                          <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
-                            <Checkbox 
-                              id={`addon-${addon.provider}-${index}`}
-                              checked={selectedAddons.includes(addon.planName)}
-                              onCheckedChange={(checked) => 
-                                handleAddonSelection(addon.planName, checked === true)
-                              }
-                            />
-                            <div className="space-y-1">
-                              <label 
-                                htmlFor={`addon-${addon.provider}-${index}`} 
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                {addon.planName}
-                              </label>
-                              <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                      <RadioGroup 
+                        value={selectedAddons.find(name => {
+                          const addon = availableAddons.find(a => a.planName === name);
+                          return addon?.provider === "American Financial 1";
+                        })}
+                        onValueChange={(value) => handleAddonSelection(value, "American Financial 1")}
+                      >
+                        {availableAddons
+                          .filter(addon => addon.provider === "American Financial 1")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                              <RadioGroupItem value={addon.planName} id={`addon-${addon.provider}-${index}`} />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                      </RadioGroup>
                     </div>
                   )}
                   
@@ -663,28 +1065,31 @@ export default function InsuranceDetails() {
                   {availableAddons.some(addon => addon.provider === "American Financial 2") && (
                     <div className="space-y-3">
                       <h5 className="font-medium text-sm border-b pb-1">American Financial 2 - Accident Medical Expense</h5>
-                      {availableAddons
-                        .filter(addon => addon.provider === "American Financial 2")
-                        .map((addon, index) => (
-                          <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
-                            <Checkbox 
-                              id={`addon-${addon.provider}-${index}`}
-                              checked={selectedAddons.includes(addon.planName)}
-                              onCheckedChange={(checked) => 
-                                handleAddonSelection(addon.planName, checked === true)
-                              }
-                            />
-                            <div className="space-y-1">
-                              <label 
-                                htmlFor={`addon-${addon.provider}-${index}`} 
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                {addon.planName}
-                              </label>
-                              <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                      <RadioGroup 
+                        value={selectedAddons.find(name => {
+                          const addon = availableAddons.find(a => a.planName === name);
+                          return addon?.provider === "American Financial 2";
+                        })}
+                        onValueChange={(value) => handleAddonSelection(value, "American Financial 2")}
+                      >
+                        {availableAddons
+                          .filter(addon => addon.provider === "American Financial 2")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                              <RadioGroupItem value={addon.planName} id={`addon-${addon.provider}-${index}`} />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                      </RadioGroup>
                     </div>
                   )}
                   
@@ -692,91 +1097,180 @@ export default function InsuranceDetails() {
                   {availableAddons.some(addon => addon.provider === "American Financial 3") && (
                     <div className="space-y-3">
                       <h5 className="font-medium text-sm border-b pb-1">American Financial 3 - Critical Illness</h5>
-                      {availableAddons
-                        .filter(addon => addon.provider === "American Financial 3")
-                        .map((addon, index) => (
-                          <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
-                            <Checkbox 
-                              id={`addon-${addon.provider}-${index}`}
-                              checked={selectedAddons.includes(addon.planName)}
-                              onCheckedChange={(checked) => 
-                                handleAddonSelection(addon.planName, checked === true)
-                              }
-                            />
-                            <div className="space-y-1">
-                              <label 
-                                htmlFor={`addon-${addon.provider}-${index}`} 
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                              >
-                                {addon.planName}
-                              </label>
-                              <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                      <RadioGroup 
+                        value={selectedAddons.find(name => {
+                          const addon = availableAddons.find(a => a.planName === name);
+                          return addon?.provider === "American Financial 3";
+                        })}
+                        onValueChange={(value) => handleAddonSelection(value, "American Financial 3")}
+                      >
+                        {availableAddons
+                          .filter(addon => addon.provider === "American Financial 3")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                              <RadioGroupItem value={addon.planName} id={`addon-${addon.provider}-${index}`} />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
+                      </RadioGroup>
                     </div>
                   )}
                   
-                  <FormField
-                    control={control}
-                    name="insuranceDetails.addonsCost"
-                    render={({ field }) => (
-                      <FormItem className="pt-3">
-                        <FormLabel>Total Add-ons Cost</FormLabel>
-                        <FormControl>
-                          <Input {...field} value={addonsTotalCost} readOnly />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {/* Essential Care Individual Add-ons */}
+                  {availableAddons.some(addon => addon.provider === "Essential Care Individual") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">Essential Care Individual</h5>
+                      <RadioGroup 
+                        value={selectedAddons.find(name => {
+                          const addon = availableAddons.find(a => a.planName === name);
+                          return addon?.provider === "Essential Care Individual";
+                        })}
+                        onValueChange={(value) => handleAddonSelection(value, "Essential Care Individual")}
+                      >
+                        {availableAddons
+                          .filter(addon => addon.provider === "Essential Care Individual")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                              <RadioGroupItem value={addon.planName} id={`addon-${addon.provider}-${index}`} />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
+                            </div>
+                          ))}
+                      </RadioGroup>
+                    </div>
+                  )}
+                  
+                  {/* AMT Addons 1 */}
+                  {availableAddons.some(addon => addon.provider === "AMT Addons 1") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">AMT Addons 1</h5>
+                      <RadioGroup 
+                        value={selectedAddons.find(name => {
+                          const addon = availableAddons.find(a => a.planName === name);
+                          return addon?.provider === "AMT Addons 1";
+                        })}
+                        onValueChange={(value) => handleAddonSelection(value, "AMT Addons 1")}
+                      >
+                        {availableAddons
+                          .filter(addon => addon.provider === "AMT Addons 1")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                              <RadioGroupItem value={addon.planName} id={`addon-${addon.provider}-${index}`} />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
+                            </div>
+                          ))}
+                      </RadioGroup>
+                    </div>
+                  )}
+                  
+                  {/* AMT Addons 2 */}
+                  {availableAddons.some(addon => addon.provider === "AMT Addons 2") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">AMT Addons 2</h5>
+                      <RadioGroup 
+                        value={selectedAddons.find(name => {
+                          const addon = availableAddons.find(a => a.planName === name);
+                          return addon?.provider === "AMT Addons 2";
+                        })}
+                        onValueChange={(value) => handleAddonSelection(value, "AMT Addons 2")}
+                      >
+                        {availableAddons
+                          .filter(addon => addon.provider === "AMT Addons 2")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-center space-x-2 border-b pb-2">
+                              <RadioGroupItem value={addon.planName} id={`addon-${addon.provider}-${index}`} />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
+                            </div>
+                          ))}
+                      </RadioGroup>
+                    </div>
+                  )}
+                  
                 </div>
               )}
             </div>
           )}
+          
+          <FormField
+            control={control}
+            name="insuranceDetails.addonsCost"
+            render={({ field }) => (
+              <FormItem className="pt-3">
+                <FormLabel>Total Add-ons Cost</FormLabel>
+                <FormControl>
+                  <Input {...field} value={addonsTotalCost} readOnly />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          {/* [X] Add-ons Commission Field */}
+          <FormField
+            control={control}
+            name="insuranceDetails.addonsCommission"
+            render={({ field }) => (
+              <FormItem className="pt-3">
+                <FormLabel>Total Add-ons Commission</FormLabel>
+                <FormControl>
+                  <Input {...field} value={addonsTotalCommission} readOnly />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          {/* [X] Total Commission Field */}
+          <FormField
+            control={control}
+            name="insuranceDetails.totalCommission"
+            render={({ field }) => (
+              <FormItem className="pt-3">
+                <FormLabel>Total Commission</FormLabel>
+                <FormControl>
+                  <Input {...field} value={totalCommission} readOnly />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
       )}
-      
-      <FormField
-        control={control}
-        name="insuranceDetails.carrierACA"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Carrier ACA</FormLabel>
-            <FormControl>
-              <Input {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="insuranceDetails.acaPlanPremium"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>ACA Plan Premium</FormLabel>
-            <FormControl>
-              <Input type="number" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="insuranceDetails.acaPlanDeductible"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>ACA Plan Deductible</FormLabel>
-            <FormControl>
-              <Input type="number" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
     </div>
   )
 }
-

@@ -22,8 +22,6 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.basicInformation.email && { 'email': formData.basicInformation.email }),
       ...(formData.basicInformation.dateOfBirth && { 'DOB': formData.basicInformation.dateOfBirth }),
       ...(formData.basicInformation.leadSource && { 'Lead Source': formData.basicInformation.leadSource }),
-      ...(formData.basicInformation.insuranceState && { 'Insurance State': formData.basicInformation.insuranceState }),
-      ...(formData.basicInformation.typeOfInsurance && { 'Type': formData.basicInformation.typeOfInsurance }),
       
       // Health Information
       ...(formData.healthInformation?.currentlyInsured && { 'Currently Insured': formData.healthInformation.currentlyInsured }),
@@ -34,6 +32,8 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.healthInformation?.projectedAnnualIncome && { 'Projected Annual Income': formData.healthInformation.projectedAnnualIncome }),
       
       // Insurance Details
+      ...(formData.insuranceDetails?.insuranceState && { 'Insurance State': formData.insuranceDetails.insuranceState }),
+      ...(formData.insuranceDetails?.typeOfInsurance && { 'Type': formData.insuranceDetails.typeOfInsurance }),
       ...(formData.insuranceDetails?.carrierU65 && { 'Carrier U65': formData.insuranceDetails.carrierU65 }),
       ...(formData.insuranceDetails?.plan && { 'Plan': formData.insuranceDetails.plan }),
       ...(formData.insuranceDetails?.carrierACA && { 'Carrier ACA': formData.insuranceDetails.carrierACA }),

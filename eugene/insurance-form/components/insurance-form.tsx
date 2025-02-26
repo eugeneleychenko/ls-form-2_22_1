@@ -68,7 +68,12 @@ export default function InsuranceForm() {
           </Button>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs 
+          value={activeTab} 
+          onValueChange={setActiveTab} 
+          defaultValue="basicInformation" 
+          className="w-full"
+        >
           {/* Mobile View - Dropdown */}
           <div className="md:hidden w-full mb-4">
             <Select value={activeTab} onValueChange={setActiveTab}>

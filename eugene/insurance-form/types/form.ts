@@ -6,8 +6,6 @@ export interface FormData {
     email?: string;
     dateOfBirth?: string;
     leadSource?: string;
-    insuranceState?: string;
-    typeOfInsurance?: string;
   };
   healthInformation?: {
     currentlyInsured?: boolean;
@@ -18,6 +16,8 @@ export interface FormData {
     projectedAnnualIncome?: string;
   };
   insuranceDetails?: {
+    insuranceState?: string;
+    typeOfInsurance?: string;
     carrierU65?: string;
     plan?: string;
     planCost?: string;
