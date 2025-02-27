@@ -77,7 +77,7 @@ export default function InsuranceForm() {
           {/* Mobile View - Dropdown */}
           <div className="md:hidden w-full mb-4">
             <Select value={activeTab} onValueChange={setActiveTab}>
-              <SelectTrigger className="w-full bg-white">
+              <SelectTrigger className="w-full">
                 <SelectValue>{currentTab?.label || "Select Section"}</SelectValue>
               </SelectTrigger>
               <SelectContent>
@@ -92,7 +92,7 @@ export default function InsuranceForm() {
 
           {/* Desktop View - Tabs */}
           <div className="hidden md:block w-full">
-            <TabsList className="grid grid-cols-3 lg:grid-cols-9 gap-2 bg-gray-100">
+            <TabsList className="grid grid-cols-3 lg:grid-cols-9 gap-2">
               {tabs.map((tab) => (
                 <TabsTrigger
                   key={tab.id}
@@ -107,7 +107,7 @@ export default function InsuranceForm() {
 
           {tabs.map((tab) => (
             <TabsContent key={tab.id} value={tab.id}>
-              <div className="bg-gray-50 p-6 rounded-lg">
+              <div>
                 <h2 className="text-2xl font-semibold text-primary mb-6">{tab.label}</h2>
                 {tab.id === "basicInformation" && <BasicInformation />}
                 {tab.id === "healthInformation" && <HealthInformation />}

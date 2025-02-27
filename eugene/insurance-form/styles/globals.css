@@ -4,6 +4,8 @@
 
 body {
   font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
 @layer utilities {
@@ -91,12 +93,14 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+    margin: 0;
+    padding: 0;
   }
 }
 
 /* Ensure form components have proper styling */
 input, select, textarea {
-  @apply block w-full rounded-md border border-gray-300 px-3 py-2 bg-white/80 focus:border-primary focus:ring-1 focus:ring-primary;
+  @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
 }
 
 /* Fix form labels */
@@ -112,41 +116,38 @@ label[required]:after {
 
 /* Fix buttons */
 button {
-  @apply inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors;
+  @apply inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
 }
 
 /* Add insurance form specific styles */
 .insurance-form-container {
-  @apply bg-white/95 backdrop-blur-sm rounded-lg shadow-lg p-6;
+  @apply max-w-4xl mx-auto;
 }
 
 /* Fix tabs styling */
 [role="tablist"] {
-  @apply flex overflow-x-auto;
+  @apply flex;
 }
 
 [role="tab"] {
-  @apply px-4 py-2 font-medium;
+  @apply px-3 py-2 text-sm font-medium;
 }
 
 [role="tab"][data-state="active"] {
-  @apply bg-primary text-white;
+  @apply bg-primary text-primary-foreground;
 }
 
 /* Fix select styling */
 [role="combobox"] {
-  @apply bg-white border border-gray-300 rounded-md;
+  @apply flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 /* Fix form section styling */
 .form-section {
-  @apply bg-white p-4 rounded-md shadow-sm;
+  @apply space-y-4;
 }
 
 /* Fix image container styling */
 .image-container {
-  position: relative !important;
-  width: 100%;
-  max-width: 200px;
-  height: 70px;
+  @apply flex items-center justify-center;
 }

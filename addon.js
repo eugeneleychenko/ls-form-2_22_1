@@ -22,7 +22,8 @@ function fetchAddons() {
       const isAddon = record.fields.Carriers && (
         record.fields.Carriers.includes('American Financial') || 
         record.fields.Carriers.includes('Essential Care Individual') ||
-        record.fields.Carriers.includes('AMT Addons')
+        record.fields.Carriers.includes('AMT Addons') ||
+        record.fields.Carriers.includes('Leo Addons')
       );
       
       if (isAddon) {
@@ -42,6 +43,9 @@ function fetchAddons() {
           addonType = 'AMT';
           if (record.fields.Carriers.includes(' 1')) addonNumber = '1';
           if (record.fields.Carriers.includes(' 2')) addonNumber = '2';
+        } else if (record.fields.Carriers.includes('Leo Addons')) {
+          addonType = 'Leo';
+          addonNumber = '1';
         }
         
         allAddons.push({
@@ -179,7 +183,8 @@ function fetchAddons() {
     const addonsByCarrier = {
       'American Financial': [],
       'Essential Care': [],
-      'AMT': []
+      'AMT': [],
+      'Leo': []
     };
     
     allAddons.forEach(addon => {
