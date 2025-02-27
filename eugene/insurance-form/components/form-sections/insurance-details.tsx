@@ -94,6 +94,38 @@ interface AddonData {
   individualChildren?: AddonCategory;
 }
 
+// Utility functions for state-based filtering
+function getExcludedStates(planName: string): string[] {
+  const match = planName.match(/\(N\/A\s+([A-Z,\s]+)\)/);
+  if (match && match[1]) {
+    return match[1].split(',').map(state => state.trim());
+  }
+  return [];
+}
+
+function isPlanAvailableInState(planName: string, selectedState: string): boolean {
+  if (!selectedState) return true; // If no state is selected, show all plans
+  const excludedStates = getExcludedStates(planName);
+  return !excludedStates.includes(selectedState);
+}
+
+// Helper function to get state name from code for UI display
+function getStateNameFromCode(stateCode: string): string {
+  const stateMap: Record<string, string> = {
+    "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas", "CA": "California",
+    "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware", "FL": "Florida", "GA": "Georgia",
+    "HI": "Hawaii", "ID": "Idaho", "IL": "Illinois", "IN": "Indiana", "IA": "Iowa",
+    "KS": "Kansas", "KY": "Kentucky", "LA": "Louisiana", "ME": "Maine", "MD": "Maryland",
+    "MA": "Massachusetts", "MI": "Michigan", "MN": "Minnesota", "MS": "Mississippi", "MO": "Missouri",
+    "MT": "Montana", "NE": "Nebraska", "NV": "Nevada", "NH": "New Hampshire", "NJ": "New Jersey",
+    "NM": "New Mexico", "NY": "New York", "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio",
+    "OK": "Oklahoma", "OR": "Oregon", "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina",
+    "SD": "South Dakota", "TN": "Tennessee", "TX": "Texas", "UT": "Utah", "VT": "Vermont",
+    "VA": "Virginia", "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming"
+  };
+  return stateMap[stateCode] || stateCode;
+}
+
 export default function InsuranceDetails() {
   const { control, setValue, watch } = useFormContext()
   const [carriers, setCarriers] = useState<string[]>([])
@@ -140,6 +172,13 @@ export default function InsuranceDetails() {
     defaultValue: ""
   });
 
+  // Add watch for selected state
+  const selectedState = useWatch({
+    control,
+    name: "insuranceDetails.insuranceState",
+    defaultValue: ""
+  });
+
   // Add useEffect hooks to log changes
   useEffect(() => {
     if (selectedType) {
@@ -158,6 +197,12 @@ export default function InsuranceDetails() {
       console.log("Plan selected:", selectedPlan);
     }
   }, [selectedPlan]);
+
+  useEffect(() => {
+    if (selectedState) {
+      console.log("Insurance State selected:", selectedState);
+    }
+  }, [selectedState]);
 
   // Memoize the fetchAddonData function to prevent it from causing infinite loops
   const fetchAddonData = useCallback(async () => {
@@ -237,7 +282,8 @@ export default function InsuranceDetails() {
                 ? String(record.fields[planCommissionKey]).replace(/\$+/g, '').trim() 
                 : "0";
               
-              if (planName && planCost) {
+              // Check if the plan is available in the selected state
+              if (planName && planCost && isPlanAvailableInState(planName, selectedState)) {
                 addons.push({
                   planName: planName,
                   planCost: planCost,
@@ -284,7 +330,7 @@ export default function InsuranceDetails() {
     } finally {
       setLoadingAddons(false);
     }
-  }, [selectedType]); // Only depend on selectedType
+  }, [selectedType, selectedState]); // Add selectedState as a dependency
 
   // Initial data fetch - only run once
   useEffect(() => {
@@ -459,21 +505,61 @@ export default function InsuranceDetails() {
     }
   }, [selectedType, allData, setValue, fetchAddonData]);
 
+  // Handle state changes - re-filter plans and add-ons when state changes
+  useEffect(() => {
+    if (selectedState) {
+      console.log("State changed to:", selectedState);
+      
+      // If carrier and type are selected, re-filter plans
+      if (selectedType && selectedCarrier && allData[selectedType]?.plans[selectedCarrier]) {
+        // This will be handled by the updated carrier effect
+      }
+      
+      // If add-ons are enabled, re-fetch add-ons with state filtering
+      if (selectedType && allData[selectedType]?.hasAddons) {
+        fetchAddonData();
+        
+        // Clear add-on selections since available options may have changed
+        setSelectedAddons([]);
+        setAddonsTotalCost("0");
+        setAddonsTotalCommission("0");
+        setValue("insuranceDetails.selectedAddons", []);
+        setValue("insuranceDetails.addonsCost", "0");
+        setValue("insuranceDetails.addonsCommission", "0");
+        
+        // Recalculate total commission
+        calculateTotalCommission(planCommission, []);
+      }
+    }
+  }, [selectedState, selectedType, selectedCarrier, allData, fetchAddonData, setValue, planCommission]);
+
   // Update plans when selected carrier changes - separate from type changes
   useEffect(() => {
     if (selectedType && selectedCarrier && allData[selectedType]?.plans[selectedCarrier]) {
       console.log("Setting up plans for carrier:", selectedCarrier);
-      console.log("Available plans:", allData[selectedType].plans[selectedCarrier].planNames);
       
-      setAvailablePlans(allData[selectedType].plans[selectedCarrier].planNames);
+      // Get all plans for the carrier
+      const allPlans = allData[selectedType].plans[selectedCarrier].planNames;
+      console.log("All plans before filtering:", allPlans);
+      
+      // Filter plans based on state availability
+      const availablePlansForState = allPlans.filter(planName => 
+        isPlanAvailableInState(planName, selectedState)
+      );
+      
+      console.log("Available plans after state filtering:", availablePlansForState);
+      setAvailablePlans(availablePlansForState);
       
       // Create a mapping of plan names to costs and commissions
       const costMap: Record<string, string> = {};
       const commissionMap: Record<string, string> = {}; // [X] Added commission mapping
       
-      allData[selectedType].plans[selectedCarrier].planNames.forEach((plan, index) => {
+      availablePlansForState.forEach(plan => {
+        // Find the index of the plan in the original array
+        const planIndex = allData[selectedType].plans[selectedCarrier].planNames.indexOf(plan);
+        
         // Ensure cost is a string and properly formatted
-        const rawCost = allData[selectedType].plans[selectedCarrier].planCosts[index];
+        const rawCost = allData[selectedType].plans[selectedCarrier].planCosts[planIndex];
         const costStr = typeof rawCost === 'object' ? 
           JSON.stringify(rawCost) : 
           (typeof rawCost === 'string' ? rawCost : String(rawCost));
@@ -483,7 +569,7 @@ export default function InsuranceDetails() {
         costMap[plan] = cleanCost ? `$${cleanCost}` : "0";
         
         // Handle commission similarly
-        const rawCommission = allData[selectedType].plans[selectedCarrier].planCommissions[index];
+        const rawCommission = allData[selectedType].plans[selectedCarrier].planCommissions[planIndex];
         const commissionStr = typeof rawCommission === 'object' ? 
           JSON.stringify(rawCommission) : 
           (typeof rawCommission === 'string' ? rawCommission : String(rawCommission || "0"));
@@ -497,17 +583,19 @@ export default function InsuranceDetails() {
       setPlanCosts(costMap);
       setPlanCommissions(commissionMap); // [X] Set commission mapping
       
-      // Clear plan selection when carrier changes
-      setValue("insuranceDetails.plan", "");
-      setValue("insuranceDetails.planCost", "");
-      setValue("insuranceDetails.planCommission", ""); // [X] Clear plan commission
+      // Clear plan selection when carrier changes or if the current plan is no longer available
+      if (selectedPlan && !availablePlansForState.includes(selectedPlan)) {
+        setValue("insuranceDetails.plan", "");
+        setValue("insuranceDetails.planCost", "");
+        setValue("insuranceDetails.planCommission", ""); // [X] Clear plan commission
+      }
     } else if (selectedCarrier) {
       // Only clear if carrier is selected but no plans are found
       setAvailablePlans([]);
       setPlanCosts({});
       setPlanCommissions({}); // [X] Clear commission mapping
     }
-  }, [selectedCarrier, selectedType, allData, setValue]);
+  }, [selectedCarrier, selectedType, selectedState, allData, setValue, selectedPlan]); // Add selectedState as a dependency
 
   // Update plan cost and commission when plan changes
   const handlePlanChange = (planName: string) => {
@@ -947,7 +1035,9 @@ export default function InsuranceDetails() {
                       : !selectedCarrier 
                         ? "Select Carrier first" 
                         : availablePlans.length === 0 
-                          ? "No plans available" 
+                          ? selectedState 
+                            ? `No plans available in ${getStateNameFromCode(selectedState)}` 
+                            : "No plans available" 
                           : "Select Plan"
                   } />
                 </SelectTrigger>
@@ -956,7 +1046,11 @@ export default function InsuranceDetails() {
                     <SelectItem value="loading" disabled>Loading...</SelectItem>
                   ) : availablePlans.length === 0 ? (
                     <SelectItem value="none" disabled>
-                      {!selectedCarrier ? "Select Carrier first" : "No plans available"}
+                      {!selectedCarrier 
+                        ? "Select Carrier first" 
+                        : selectedState 
+                          ? `No plans available in ${getStateNameFromCode(selectedState)}` 
+                          : "No plans available"}
                     </SelectItem>
                   ) : (
                     availablePlans.map((plan) => (
