@@ -48,7 +48,9 @@ fetch(endpoint, {
           plan8Commission: new Set(),
         },
         // New structure to map plans, costs, and commissions
-        planMappings: []
+        planMappings: [],
+        // Add a structure to store all records with their full data
+        records: []
       };
     }
 
@@ -99,10 +101,52 @@ fetch(endpoint, {
           carrier: carrier,
           plan: record.fields[planKey],
           cost: record.fields[costKey] || null,
-          commission: record.fields[commissionKey] || null
+          commission: record.fields[commissionKey] || null,
+          // Add the two new columns
+          enrollmentFees: record.fields['Enrollment Fees'] || null,
+          statesUnavailable: record.fields['States Unavailable'] || null
         });
       }
     }
+    
+    // Store the complete record data
+    dataByType[type].records.push({
+      id: record.id,
+      type: type,
+      carrier: carrier,
+      // Include all plan data
+      plan1: record.fields['Plan 1'] || null,
+      plan1Cost: record.fields['Plan 1 Cost'] || null,
+      plan1Commission: record.fields['Plan 1 Commission'] || null,
+      plan2: record.fields['Plan 2'] || null,
+      plan2Cost: record.fields['Plan 2 Cost'] || null,
+      plan2Commission: record.fields['Plan 2 Commission'] || null,
+      plan3: record.fields['Plan 3'] || null,
+      plan3Cost: record.fields['Plan 3 Cost'] || null,
+      plan3Commission: record.fields['Plan 3 Commission'] || null,
+      plan4: record.fields['Plan 4'] || null,
+      plan4Cost: record.fields['Plan 4 Cost'] || null,
+      plan4Commission: record.fields['Plan 4 Commission'] || null,
+      plan5: record.fields['Plan 5'] || null,
+      plan5Cost: record.fields['Plan 5 Cost'] || null,
+      plan5Commission: record.fields['Plan 5 Commission'] || null,
+      plan6: record.fields['Plan 6'] || null,
+      plan6Cost: record.fields['Plan 6 Cost'] || null,
+      plan6Commission: record.fields['Plan 6 Commission'] || null,
+      plan7: record.fields['Plan 7'] || null,
+      plan7Cost: record.fields['Plan 7 Cost'] || null,
+      plan7Commission: record.fields['Plan 7 Commission'] || null,
+      plan8: record.fields['Plan 8'] || null,
+      plan8Cost: record.fields['Plan 8 Cost'] || null,
+      plan8Commission: record.fields['Plan 8 Commission'] || null,
+      // Add the two new columns
+      enrollmentFees: record.fields['Enrollment Fees'] || null,
+      statesUnavailable: record.fields['States Unavailable'] || null,
+      // Include any other fields that might be useful
+      addons: record.fields['Addons?'] || false,
+      // Store the original record for reference
+      originalRecord: record.fields
+    });
   });
 
   // Convert Sets to Arrays and create final output
@@ -137,11 +181,53 @@ fetch(endpoint, {
         plan8Commission: Array.from(data.plans.plan8Commission).sort(),
       },
       // Include the plan mappings in the output
-      planMappings: data.planMappings
+      planMappings: data.planMappings,
+      // Include the full records
+      records: data.records
     };
   }
 
+  // Create a tabular view of the data
+  const tabularData = [];
+  
+  // For each type and record, create a row-based view
+  for (const [type, data] of Object.entries(dataByType)) {
+    data.records.forEach(record => {
+      // For each plan in the record, create a separate row
+      for (let i = 1; i <= 8; i++) {
+        const planKey = `plan${i}`;
+        const costKey = `${planKey}Cost`;
+        const commissionKey = `${planKey}Commission`;
+        
+        if (record[planKey]) {
+          tabularData.push({
+            type: type,
+            carrier: record.carrier,
+            planNumber: i,
+            planName: record[planKey],
+            planCost: record[costKey],
+            planCommission: record[commissionKey],
+            enrollmentFees: record.enrollmentFees,
+            statesUnavailable: record.statesUnavailable,
+            addons: record.addons
+          });
+        }
+      }
+    });
+  }
+
+  console.log("Formatted data by type:");
   console.log(JSON.stringify(formattedOutput, null, 2));
+  
+  console.log("\nTabular data (row-based view):");
+  console.log(JSON.stringify(tabularData, null, 2));
+  
+  // Optional: Create a CSV-like output for easy viewing
+  console.log("\nCSV-like view:");
+  console.log("Type,Carrier,Plan #,Plan Name,Plan Cost,Plan Commission,Enrollment Fees,States Unavailable,Has Addons");
+  tabularData.forEach(row => {
+    console.log(`${row.type},${row.carrier},${row.planNumber},${row.planName},${row.planCost},${row.planCommission},${row.enrollmentFees},${row.statesUnavailable},${row.addons}`);
+  });
 })
 .catch(error => {
   console.error('Error fetching data:', error);

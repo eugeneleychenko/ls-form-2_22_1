@@ -38,6 +38,8 @@ interface AirtableRecord {
     "Plan 8 Cost"?: string;
     "Plan 8 Commission"?: string;
     "Addons?"?: boolean;
+    "Enrollment Fees"?: string;
+    "States Unavailable"?: string[];
     [key: string]: any;
   };
 }
@@ -126,6 +128,16 @@ function getStateNameFromCode(stateCode: string): string {
   return stateMap[stateCode] || stateCode;
 }
 
+// Add new helper functions/variables at the top level
+
+// Add a function to calculate enrollment commission based on fee
+const calculateEnrollmentCommission = (enrollmentFee: string): number => {
+  const feeValue = parseFloat(enrollmentFee.replace(/[^0-9.]/g, '')) || 0;
+  if (feeValue === 99) return 10;
+  if (feeValue === 125) return 15;
+  return 0;
+};
+
 export default function InsuranceDetails() {
   const { control, setValue, watch } = useFormContext()
   const [carriers, setCarriers] = useState<string[]>([])
@@ -156,6 +168,16 @@ export default function InsuranceDetails() {
   // State for insurance types
   const [insuranceTypes, setInsuranceTypes] = useState<string[]>([])
   const [loadingTypes, setLoadingTypes] = useState(true)
+  
+  // Add state to track enrollment fees for plans
+  const [planEnrollmentFees, setPlanEnrollmentFees] = useState<Record<string, string>>({})
+  
+  // Add state for enrollment fee options by carrier
+  const [enrollmentFeeOptions, setEnrollmentFeeOptions] = useState<string[]>([])
+  const [selectedEnrollmentFee, setSelectedEnrollmentFee] = useState<string>("")
+  
+  // Add state to store the raw Airtable data
+  const [airtableData, setAirtableData] = useState<AirtableRecord[]>([])
   
   // Watch for changes to the type of insurance and carrier
   const selectedType = useWatch({
@@ -361,14 +383,28 @@ export default function InsuranceDetails() {
 
         const data: AirtableResponse = await response.json();
         
+        // Store the raw data for later use
+        setAirtableData(data.records);
+        
         console.log("Raw data from Airtable:", data.records.length, "records");
         
         // Process the data to organize by type
         const dataByType: Record<string, CarrierData> = {};
         
+        // Collect all enrollment fees by carrier
+        const allEnrollmentFeesByCarrier: Record<string, Set<string>> = {};
+        
         data.records.forEach(record => {
           const type = record.fields.Type;
           const carrier = record.fields.Carriers;
+          
+          // Track enrollment fees by carrier
+          if (carrier && record.fields["Enrollment Fees"]) {
+            if (!allEnrollmentFeesByCarrier[carrier]) {
+              allEnrollmentFeesByCarrier[carrier] = new Set();
+            }
+            allEnrollmentFeesByCarrier[carrier].add(record.fields["Enrollment Fees"]);
+          }
           
           // Set hasAddons at the type level for any record with add-ons first, before filtering
           if (record.fields["Addons?"]) {
@@ -432,6 +468,9 @@ export default function InsuranceDetails() {
             }
           }
         });
+        
+        // Store enrollment fee options for easy access
+        console.log("Enrollment fees by carrier:", allEnrollmentFeesByCarrier);
         
         // Mark types that have American Financial addons
         data.records.forEach(record => {
@@ -541,7 +580,7 @@ export default function InsuranceDetails() {
         setValue("insuranceDetails.addonsCommission", "0");
         
         // Recalculate total commission
-        calculateTotalCommission(planCommission, []);
+        calculateTotalCommission(planCommission, selectedAddons);
       }
     }
   }, [selectedState, selectedType, selectedCarrier, allData, fetchAddonData, setValue, planCommission]);
@@ -566,6 +605,7 @@ export default function InsuranceDetails() {
       // Create a mapping of plan names to costs and commissions
       const costMap: Record<string, string> = {};
       const commissionMap: Record<string, string> = {}; // [X] Added commission mapping
+      const enrollmentMap: Record<string, string> = {};
       
       availablePlansForState.forEach(plan => {
         // Find the index of the plan in the original array
@@ -587,14 +627,37 @@ export default function InsuranceDetails() {
           JSON.stringify(rawCommission) : 
           (typeof rawCommission === 'string' ? rawCommission : String(rawCommission || "0"));
         
-        commissionMap[plan] = commissionStr.replace(/[^0-9.]/g, ''); // [X] Map commissions
+        // Check if commission is in decimal format (e.g., 0.30, 0.35)
+        const commissionValue = parseFloat(commissionStr.replace(/[^0-9.]/g, ''));
+        
+        // If commission is in decimal format (between 0 and 1), convert to percentage
+        // Otherwise, use the value as is
+        const finalCommission = (commissionValue > 0 && commissionValue <= 1) ? 
+          (commissionValue * 100).toString() : 
+          commissionStr.replace(/[^0-9.]/g, '');
+        
+        commissionMap[plan] = finalCommission || "0"; // [X] Map commissions
+        
+        // Find the record for this plan in the raw data
+        const planNumberForSearch = planIndex + 1;
+        airtableData.forEach((record: AirtableRecord) => {
+          if (record.fields.Type === selectedType && 
+              record.fields.Carriers === selectedCarrier &&
+              record.fields[`Plan ${planNumberForSearch}`] === plan) {
+            if (record.fields['Enrollment Fees']) {
+              enrollmentMap[plan] = record.fields['Enrollment Fees'];
+            }
+          }
+        });
       });
       
       console.log("Processed cost map:", costMap);
       console.log("Processed commission map:", commissionMap);
+      console.log("Processed enrollment fees map:", enrollmentMap);
       
       setPlanCosts(costMap);
       setPlanCommissions(commissionMap); // [X] Set commission mapping
+      setPlanEnrollmentFees(enrollmentMap);
       
       // Clear plan selection when carrier changes or if the current plan is no longer available
       if (selectedPlan && !availablePlansForState.includes(selectedPlan)) {
@@ -634,67 +697,65 @@ export default function InsuranceDetails() {
       return;
     }
     
-    console.log("Available plan costs:", planCosts);
-    console.log("Available plan commissions:", planCommissions); // [X] Log commissions
-    
     const cost = planCosts[planName] || "";
-    let commissionRate = planCommissions[planName] || "0"; // [X] Get commission rate for selected plan
+    let commissionRate = planCommissions[planName] || "0";
+    
+    // Log commission data for debugging
+    console.log("Raw commission rate:", commissionRate, "Type:", typeof commissionRate);
+    
+    // Special handling for Sigma Care Plus and other carriers with decimal commissions
+    if (parseFloat(commissionRate) > 0) {
+      // Commission rate is already handled above where we create the commissionMap
+      console.log("Using existing commission rate:", commissionRate);
+    } else {
+      // Fallback to a default commission if no valid rate is found
+      console.log("No valid commission rate found, using default");
+      commissionRate = selectedCarrier.toLowerCase().includes("sigma") ? "30" : "20";
+    }
+    
+    // Use the selected enrollment fee from dropdown instead of planEnrollmentFees
+    const enrollmentFee = selectedEnrollmentFee || "0";
+    
+    // Calculate enrollment commission
+    const enrollmentCommission = calculateEnrollmentCommission(enrollmentFee);
     
     // Debug the cost value
     console.log("Raw cost value:", cost, "Type:", typeof cost);
+    console.log("Enrollment fee:", enrollmentFee);
     
-    // Calculate commission as rate * cost
-    let calculatedCommission = "0";
-    let displayRate = "0%"; // Initialize displayRate
+    // Use the cost as the formatted cost - it's already formatted
+    const formattedCost = cost;
     
-    if (cost && commissionRate) {
-      // Ensure cost is a clean number string before parsing
-      const costString = typeof cost === 'string' ? cost.replace(/[^0-9.]/g, '') : String(cost).replace(/[^0-9.]/g, '');
-      const costValue = parseFloat(costString);
-      
-      // Ensure commission rate is a clean number string before parsing
-      const rateString = typeof commissionRate === 'string' ? commissionRate.replace(/[^0-9.]/g, '') : String(commissionRate).replace(/[^0-9.]/g, '');
-      const parsedRate = parseFloat(rateString);
-      
-      // Check if the rate is already a decimal (like 0.2) or a percentage (like 20)
-      let rateValue;
-      
-      if (parsedRate > 0 && parsedRate <= 1) {
-        // Already a decimal percentage (e.g., 0.2 for 20%)
-        rateValue = parsedRate;
-        displayRate = `${(parsedRate * 100).toFixed(1)}%`;
-        console.log("Rate is already a decimal:", parsedRate, "Display as:", displayRate);
-      } else {
-        // Default to 20% if invalid or zero
-        const percentageRate = parsedRate || 20;
-        rateValue = percentageRate / 100; // Convert percentage to decimal
-        displayRate = `${percentageRate}%`;
-        console.log("Converting percentage rate:", percentageRate, "to decimal:", rateValue);
-      }
-      
-      console.log("Parsed cost value:", costValue, "Rate value:", rateValue);
-      
-      if (!isNaN(costValue) && !isNaN(rateValue)) {
-        calculatedCommission = `$${(costValue * rateValue).toFixed(2)}`;
-      }
-    }
+    // Extract the numeric value for calculations
+    const costValue = parseFloat(cost.replace(/[^0-9.]/g, ''));
+    const enrollmentFeeValue = parseFloat(enrollmentFee.replace(/[^0-9.]/g, '') || "0");
     
-    // Format the cost value for display
-    const formattedCost = cost ? (cost.startsWith('$') ? cost : `$${cost.replace(/[^0-9.]/g, '')}`) : "$0";
+    // Calculate commission as a dollar amount
+    let calculatedCommission = `$${(parseFloat(commissionRate) * 0.01 * costValue).toFixed(2)}`;
+    let displayRate = commissionRate + "%";
+    
+    // Calculate first month premium (cost + enrollment fee)
+    const firstMonthPremium = costValue + enrollmentFeeValue;
     
     console.log("Setting plan cost to:", formattedCost);
     console.log("Commission rate:", commissionRate);
     console.log("Calculated commission:", calculatedCommission);
+    console.log("Enrollment fee:", `$${enrollmentFee}`);
+    console.log("First month premium:", `$${firstMonthPremium.toFixed(2)}`);
     
     setValue("insuranceDetails.planCost", formattedCost);
-    setValue("insuranceDetails.commissionRate", displayRate || (commissionRate + "%")); // Store the rate with % symbol
-    setValue("insuranceDetails.planCommission", calculatedCommission); // Set calculated commission value
-    setPlanCommission(calculatedCommission); // Update state
+    setValue("insuranceDetails.commissionRate", displayRate);
+    setValue("insuranceDetails.planCommission", calculatedCommission);
+    setValue("insuranceDetails.enrollmentFee", `$${enrollmentFee}`);
+    setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
+    setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
+    setValue("insuranceDetails.monthlyPremium", formattedCost);
+    setPlanCommission(calculatedCommission);
     
     // Calculate total commission (plan + addons)
-    calculateTotalCommission(calculatedCommission, selectedAddons); // Calculate total commission
+    calculateTotalCommission(calculatedCommission, selectedAddons);
   };
-  
+
   // Handle addon checkbox change
   const handleAddonsToggle = (checked: boolean) => {
     setAddonsEnabled(checked);
@@ -843,8 +904,20 @@ export default function InsuranceDetails() {
     const { totalCommission: addonCommissionValue } = calculateAddonsValues(selectedAddons);
     const addonCommissionNumber = parseFloat(addonCommissionValue.replace(/[^0-9.]/g, '') || "0");
     
-    // Calculate total
-    const total = planCommissionNumber + addonCommissionNumber;
+    // Get enrollment commission
+    const enrollmentCommissionValue = watch("insuranceDetails.enrollmentCommission") || "$0";
+    const enrollmentCommissionNumber = parseFloat(enrollmentCommissionValue.replace(/[^0-9.]/g, '') || "0");
+    
+    // Log commission values for debugging
+    console.log("Commission calculation:", {
+      plan: planCommissionNumber,
+      addons: addonCommissionNumber,
+      enrollment: enrollmentCommissionNumber,
+      total: planCommissionNumber + addonCommissionNumber + enrollmentCommissionNumber
+    });
+    
+    // Calculate total (plan + addons + enrollment)
+    const total = planCommissionNumber + addonCommissionNumber + enrollmentCommissionNumber;
     const totalFormatted = `$${total.toFixed(2)}`;
     
     setTotalCommission(totalFormatted);
@@ -900,6 +973,88 @@ export default function InsuranceDetails() {
 
     fetchInsuranceTypes();
   }, []);
+
+  // Update enrollment fee options when carrier changes
+  useEffect(() => {
+    if (selectedCarrier) {
+      // Collect all enrollment fees for this carrier from the airtable data
+      const feeOptions = new Set<string>();
+      
+      airtableData.forEach((record: AirtableRecord) => {
+        if (record.fields.Carriers === selectedCarrier && 
+            record.fields["Enrollment Fees"]) {
+          // Check if the enrollment fee is a comma-separated list
+          const feeValue = record.fields["Enrollment Fees"];
+          if (typeof feeValue === 'string' && feeValue.includes(',')) {
+            // Split the comma-separated list into individual values
+            const fees = feeValue.split(',').map(fee => fee.trim().replace(/^\$/, ''));
+            fees.forEach(fee => {
+              if (fee) feeOptions.add(fee);
+            });
+          } else {
+            // Add the single value
+            const fee = typeof feeValue === 'string' ? feeValue.replace(/^\$/, '') : String(feeValue);
+            feeOptions.add(fee);
+          }
+        }
+      });
+      
+      // Add default options if none found
+      if (feeOptions.size === 0) {
+        feeOptions.add("0");
+        feeOptions.add("27.50");
+        feeOptions.add("50");
+        feeOptions.add("99");
+        feeOptions.add("125");
+      }
+      
+      // Convert set to array and sort
+      const sortedOptions = Array.from(feeOptions).sort((a, b) => {
+        // Convert to numbers for proper sorting
+        const numA = parseFloat(a.replace(/[^0-9.]/g, ''));
+        const numB = parseFloat(b.replace(/[^0-9.]/g, ''));
+        return numA - numB;
+      });
+      
+      console.log("Enrollment fee options for carrier", selectedCarrier, ":", sortedOptions);
+      setEnrollmentFeeOptions(sortedOptions);
+      
+      // Set default enrollment fee (first option)
+      if (sortedOptions.length > 0) {
+        setSelectedEnrollmentFee(sortedOptions[0]);
+        setValue("insuranceDetails.enrollmentFee", `$${sortedOptions[0]}`);
+        const enrollmentCommission = calculateEnrollmentCommission(sortedOptions[0]);
+        setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
+      } else {
+        setSelectedEnrollmentFee("");
+        setValue("insuranceDetails.enrollmentFee", "$0");
+        setValue("insuranceDetails.enrollmentCommission", "$0");
+      }
+    }
+  }, [selectedCarrier, airtableData, setValue]);
+
+  // Handle enrollment fee change
+  const handleEnrollmentFeeChange = (fee: string) => {
+    setSelectedEnrollmentFee(fee);
+    setValue("insuranceDetails.enrollmentFee", `$${fee}`);
+    
+    // Calculate enrollment commission
+    const enrollmentCommission = calculateEnrollmentCommission(fee);
+    setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
+    
+    // Recalculate first month premium
+    if (selectedPlan) {
+      const cost = planCosts[selectedPlan] || "0";
+      const costValue = parseFloat(cost.replace(/[^0-9.]/g, ''));
+      const enrollmentFeeValue = parseFloat(fee.replace(/[^0-9.]/g, '') || "0");
+      const firstMonthPremium = costValue + enrollmentFeeValue;
+      
+      setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
+      
+      // Recalculate total commission to include new enrollment commission
+      calculateTotalCommission(planCommission, selectedAddons);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -1490,23 +1645,108 @@ export default function InsuranceDetails() {
               </FormItem>
             )}
           />
-          
-          {/* [X] Total Commission Field */}
-          <FormField
-            control={control}
-            name="insuranceDetails.totalCommission"
-            render={({ field }) => (
-              <FormItem className="pt-3">
-                <FormLabel>Total Commission</FormLabel>
-                <FormControl>
-                  <Input {...field} value={totalCommission} readOnly />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
       )}
+
+      {/* Replace the dropdown with radio buttons for Enrollment Fee */}
+      <FormField
+        control={control}
+        name="insuranceDetails.enrollmentFee"
+        render={({ field }) => (
+          <FormItem className="space-y-3">
+            <FormLabel>Enrollment Fee</FormLabel>
+            <FormControl>
+              <RadioGroup 
+                onValueChange={(value) => {
+                  field.onChange(`$${value}`);
+                  handleEnrollmentFeeChange(value);
+                }}
+                value={selectedEnrollmentFee}
+                className="flex flex-col space-y-1"
+              >
+                {enrollmentFeeOptions.length === 0 ? (
+                  <div className="text-sm text-gray-500">No enrollment fees available</div>
+                ) : (
+                  <div className="flex flex-wrap gap-4">
+                    {enrollmentFeeOptions.map((fee) => (
+                      <div className="flex items-center space-x-2" key={fee}>
+                        <RadioGroupItem value={fee} id={`fee-${fee}`} disabled={!selectedCarrier} />
+                        <label 
+                          htmlFor={`fee-${fee}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          ${fee}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </RadioGroup>
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name="insuranceDetails.enrollmentCommission"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Enrollment Commission</FormLabel>
+            <FormControl>
+              <Input {...field} readOnly />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name="insuranceDetails.firstMonthPremium"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>First Month Premium</FormLabel>
+            <FormControl>
+              <Input {...field} readOnly />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <FormField
+        control={control}
+        name="insuranceDetails.monthlyPremium"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Monthly Premium</FormLabel>
+            <FormControl>
+              <Input {...field} readOnly />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
+      {/* [X] Total Commission Field - Moved here */}
+      <FormField
+        control={control}
+        name="insuranceDetails.totalCommission"
+        render={({ field }) => (
+          <FormItem className="pt-3">
+            <FormLabel>Total Commission</FormLabel>
+            <FormControl>
+              <Input {...field} value={totalCommission} readOnly />
+            </FormControl>
+            <FormDescription className="text-sm text-muted-foreground">
+              Includes: Plan Commission + Add-ons Commission + Enrollment Commission
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
     </div>
   )
 }
