@@ -134,6 +134,10 @@ export default function InsuranceDetails() {
   const [availablePlans, setAvailablePlans] = useState<string[]>([])
   const [planCosts, setPlanCosts] = useState<Record<string, string>>({})
   
+  // Add state for Access Health STM
+  const [isAccessHealthSelected, setIsAccessHealthSelected] = useState(false)
+  const [manualPlanCost, setManualPlanCost] = useState("")
+  
   // Addon states
   const [loadingAddons, setLoadingAddons] = useState(false)
   const [addonsEnabled, setAddonsEnabled] = useState(false)
@@ -189,6 +193,15 @@ export default function InsuranceDetails() {
   useEffect(() => {
     if (selectedCarrier) {
       console.log("Carrier U65 selected:", selectedCarrier);
+      
+      // Check if Access Health STM is selected
+      const isAccessHealth = selectedCarrier === "Access Health STM";
+      setIsAccessHealthSelected(isAccessHealth);
+      
+      // Reset manual cost input when switching carriers
+      if (!isAccessHealth) {
+        setManualPlanCost("");
+      }
     }
   }, [selectedCarrier]);
 
@@ -589,6 +602,20 @@ export default function InsuranceDetails() {
         setValue("insuranceDetails.planCost", "");
         setValue("insuranceDetails.planCommission", ""); // [X] Clear plan commission
       }
+    } else if (selectedCarrier === "Access Health STM") {
+      // Special handling for Access Health STM
+      console.log("Access Health STM selected, providing custom plan options");
+      
+      // Set a single placeholder plan for Access Health STM
+      setAvailablePlans(["Custom Plan"]);
+      
+      // Clear plan selection and costs
+      setValue("insuranceDetails.plan", "Custom Plan");
+      setValue("insuranceDetails.planCost", "");
+      setValue("insuranceDetails.planCommission", "");
+      setValue("insuranceDetails.commissionRate", "");
+      setPlanCosts({});
+      setPlanCommissions({});
     } else if (selectedCarrier) {
       // Only clear if carrier is selected but no plans are found
       setAvailablePlans([]);
@@ -600,6 +627,13 @@ export default function InsuranceDetails() {
   // Update plan cost and commission when plan changes
   const handlePlanChange = (planName: string) => {
     console.log("Plan selected:", planName);
+    
+    // Skip normal plan cost handling if Access Health STM is selected
+    if (isAccessHealthSelected) {
+      console.log("Access Health STM selected, using manual cost entry");
+      return;
+    }
+    
     console.log("Available plan costs:", planCosts);
     console.log("Available plan commissions:", planCommissions); // [X] Log commissions
     
@@ -1023,10 +1057,13 @@ export default function InsuranceDetails() {
               <Select 
                 onValueChange={(value) => {
                   field.onChange(value);
-                  handlePlanChange(value);
+                  // Special handling for Access Health STM - don't calculate cost from plans
+                  if (!isAccessHealthSelected) {
+                    handlePlanChange(value);
+                  }
                 }} 
                 defaultValue={field.value}
-                disabled={!selectedCarrier || availablePlans.length === 0}
+                disabled={!selectedCarrier || (availablePlans.length === 0 && !isAccessHealthSelected)}
               >
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
                   <SelectValue placeholder={
@@ -1071,7 +1108,46 @@ export default function InsuranceDetails() {
           <FormItem>
             <FormLabel>Plan Cost</FormLabel>
             <FormControl>
-              <Input {...field} readOnly />
+              {isAccessHealthSelected ? (
+                <Input 
+                  value={manualPlanCost} 
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setManualPlanCost(value);
+                    
+                    // Calculate commission based on entered cost
+                    let rate = 0.3; // 30% for under $500
+                    let displayRate = "30%";
+                    
+                    // Clean the input value for numeric processing
+                    const numericValue = value.replace(/[^0-9.]/g, '');
+                    const cost = parseFloat(numericValue);
+                    
+                    if (!isNaN(cost)) {
+                      // Determine commission rate based on cost
+                      if (cost > 500) {
+                        rate = 0.35; // 35% for over $500
+                        displayRate = "35%";
+                      }
+                      
+                      // Calculate commission
+                      const calculatedCommission = `$${(cost * rate).toFixed(2)}`;
+                      
+                      // Update form values
+                      setValue("insuranceDetails.planCost", `$${numericValue}`);
+                      setValue("insuranceDetails.commissionRate", displayRate);
+                      setValue("insuranceDetails.planCommission", calculatedCommission);
+                      setPlanCommission(calculatedCommission);
+                      
+                      // Calculate total commission
+                      calculateTotalCommission(calculatedCommission, selectedAddons);
+                    }
+                  }}
+                  placeholder="Enter plan cost"
+                />
+              ) : (
+                <Input {...field} readOnly />
+              )}
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -1287,6 +1363,36 @@ export default function InsuranceDetails() {
                     </div>
                   )}
                   
+                  {/* Leo Addons - Multiselect */}
+                  {availableAddons.some(addon => addon.provider === "Leo Addons") && (
+                    <div className="space-y-3">
+                      <h5 className="font-medium text-sm border-b pb-1">Leo Addons</h5>
+                      <div className="space-y-2">
+                        {availableAddons
+                          .filter(addon => addon.provider === "Leo Addons")
+                          .map((addon, index) => (
+                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-start space-x-2 border-b pb-2">
+                              <Checkbox 
+                                id={`addon-${addon.provider}-${index}`} 
+                                checked={isAddonSelected(addon.planName)}
+                                onCheckedChange={(checked) => handleMultiAddonSelection(addon.planName, checked === true)}
+                              />
+                              <div className="space-y-1">
+                                <label 
+                                  htmlFor={`addon-${addon.provider}-${index}`} 
+                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                >
+                                  {addon.planName}
+                                </label>
+                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
+                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* AMT Addons 1 */}
                   {availableAddons.some(addon => addon.provider === "AMT Addons 1") && (
                     <div className="space-y-3">
@@ -1348,36 +1454,6 @@ export default function InsuranceDetails() {
                             </div>
                           ))}
                       </RadioGroup>
-                    </div>
-                  )}
-                  
-                  {/* Leo Addons - Multiselect */}
-                  {availableAddons.some(addon => addon.provider === "Leo Addons") && (
-                    <div className="space-y-3">
-                      <h5 className="font-medium text-sm border-b pb-1">Leo Addons</h5>
-                      <div className="space-y-2">
-                        {availableAddons
-                          .filter(addon => addon.provider === "Leo Addons")
-                          .map((addon, index) => (
-                            <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-start space-x-2 border-b pb-2">
-                              <Checkbox 
-                                id={`addon-${addon.provider}-${index}`} 
-                                checked={isAddonSelected(addon.planName)}
-                                onCheckedChange={(checked) => handleMultiAddonSelection(addon.planName, checked === true)}
-                              />
-                              <div className="space-y-1">
-                                <label 
-                                  htmlFor={`addon-${addon.provider}-${index}`} 
-                                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                                >
-                                  {addon.planName}
-                                </label>
-                                <p className="text-xs text-gray-500">Cost: ${addon.planCost}</p>
-                                <p className="text-xs text-gray-500">Commission: {Number(addon.planCommission) <= 1 ? Number(addon.planCommission) * 100 : Number(addon.planCommission)}%</p>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
                     </div>
                   )}
                   

@@ -1,0 +1,4 @@
+[x]-we need an expiration date and cvv for the credit card, the fields are already in airtable.
+[x]-when STM is selected for the main plan, an input box renders so the agent can manually enter the price, commission is 30% for under $500 and 35% for over $500
+[x]-The leo addons should be above the amt addons.
+-Enrollment fees for both main plans and the addons, I'll add a field with the prices. The commission for enrollment is a flat $10 for a $99 enrollment fee and $15 for a $125. The first month premium needs to be displayed which includes the enrollment fees and the monthly premium which does not

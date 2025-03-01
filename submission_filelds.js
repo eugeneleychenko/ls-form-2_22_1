@@ -4,11 +4,11 @@ const endpoint = `https://api.airtable.com/v0/${baseId}/${tableId}`;
 
 https://airtable.com/appYMEW2CsYkdpQ7c/shrQ0FciTfp8PzYIh/tblBxPxL2R5AEyZaC
 
-// Function to fetch all fields from the specified table
+// Function to fetch column headings from the specified table
 function fetchSubmissionFields() {
-  console.log('Fetching submission fields from Airtable...');
+  console.log('Fetching column headings from Airtable...');
   
-  return fetch(endpoint, {
+  return fetch(endpoint + '?maxRecords=1', {
     headers: {
       Authorization: `Bearer pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025`
     }
@@ -21,41 +21,40 @@ function fetchSubmissionFields() {
   })
   .then(data => {
     if (data.records && data.records.length > 0) {
-      // Process the records to extract all fields
-      const fields = {};
-      
-      data.records.forEach(record => {
-        // Add all fields from each record to our fields object
-        Object.keys(record.fields).forEach(key => {
-          if (!fields[key]) {
-            fields[key] = new Set();
-          }
-          
-          // Add the value to the set (to avoid duplicates)
-          if (Array.isArray(record.fields[key])) {
-            record.fields[key].forEach(value => fields[key].add(value));
-          } else {
-            fields[key].add(record.fields[key]);
-          }
-        });
+      // Get the schema information to determine field order
+      return fetch(`https://api.airtable.com/v0/meta/bases/${baseId}/tables`, {
+        headers: {
+          Authorization: `Bearer pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892de800833bde9d06633f395527025`
+        }
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(schemaData => {
+        // Find the table in the schema
+        const table = schemaData.tables.find(t => t.id === tableId);
+        if (table && table.fields) {
+          // Return just the field names in order
+          const orderedFields = table.fields.map(field => field.name);
+          console.log('Successfully fetched column headings');
+          return orderedFields;
+        } else {
+          // Fallback: return keys from the first record if schema info is not available
+          console.log('Table schema not found, returning keys from first record');
+          return Object.keys(data.records[0].fields);
+        }
       });
-      
-      // Convert sets to arrays for the final output
-      const formattedFields = {};
-      Object.keys(fields).forEach(key => {
-        formattedFields[key] = Array.from(fields[key]).sort();
-      });
-      
-      console.log('Successfully fetched submission fields');
-      return formattedFields;
     } else {
       console.log('No records found in the table');
-      return {};
+      return [];
     }
   })
   .catch(error => {
-    console.error('Error fetching submission fields:', error);
-    return {};
+    console.error('Error fetching column headings:', error);
+    return [];
   });
 }
 
@@ -66,7 +65,7 @@ module.exports = {
 
 // If this file is run directly, execute the function and log the results
 if (require.main === module) {
-  fetchSubmissionFields().then(fields => {
-    console.log(JSON.stringify(fields, null, 2));
+  fetchSubmissionFields().then(columnHeadings => {
+    console.log(columnHeadings);
   });
 }

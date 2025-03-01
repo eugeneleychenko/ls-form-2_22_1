@@ -189,6 +189,70 @@ export default function BillingInformation() {
           </FormItem>
         )}
       />
+      
+      <div className="grid grid-cols-3 gap-4">
+        <FormField
+          control={control}
+          name="billingInformation.expMonth"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Exp. Month</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="MM" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {Array.from({ length: 12 }, (_, i) => {
+                    const month = (i + 1).toString().padStart(2, '0');
+                    return <SelectItem key={month} value={month}>{month}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={control}
+          name="billingInformation.expYear"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Exp. Year</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="YYYY" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {Array.from({ length: 10 }, (_, i) => {
+                    const year = (new Date().getFullYear() + i).toString();
+                    return <SelectItem key={year} value={year}>{year}</SelectItem>;
+                  })}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={control}
+          name="billingInformation.cvv"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>CVV</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="XXX" maxLength={4} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
     </div>
   )
 }
