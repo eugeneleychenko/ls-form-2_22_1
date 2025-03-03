@@ -20,7 +20,7 @@ export default function DependentsInformation() {
             name={`dependentsInformation.${index}.name`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
+                <FormLabel>Name <sub>[Airtable: Dependent {index+1} Name]</sub></FormLabel>
                 <FormControl>
                   <Input {...field} />
                 </FormControl>
@@ -33,7 +33,7 @@ export default function DependentsInformation() {
             name={`dependentsInformation.${index}.dob`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date of Birth</FormLabel>
+                <FormLabel>Date of Birth <sub>[Airtable: Dependent {index+1} DOB]</sub></FormLabel>
                 <FormControl>
                   <Input type="date" {...field} />
                 </FormControl>
@@ -46,7 +46,7 @@ export default function DependentsInformation() {
             name={`dependentsInformation.${index}.ssn`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>SSN</FormLabel>
+                <FormLabel>SSN <sub>[Airtable: Dependent {index+1} SSN]</sub></FormLabel>
                 <FormControl>
                   <Input {...field} placeholder="XXX-XX-XXXX" />
                 </FormControl>
@@ -59,7 +59,7 @@ export default function DependentsInformation() {
             name={`dependentsInformation.${index}.gender`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Gender</FormLabel>
+                <FormLabel>Gender <sub>[Airtable: Dependent {index+1} Gender]</sub></FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -81,7 +81,7 @@ export default function DependentsInformation() {
             name={`dependentsInformation.${index}.relationship`}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Relationship</FormLabel>
+                <FormLabel>Relationship <sub>[Airtable: Dependent {index+1} Relationship]</sub></FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>

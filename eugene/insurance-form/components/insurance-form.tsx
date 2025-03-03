@@ -32,15 +32,185 @@ export default function InsuranceForm() {
     }
 
     try {
-      await submitToAirtable(data)
+      console.log('Submitting form data:', JSON.stringify(data, null, 2));
+      const response = await submitToAirtable(data)
       toast.success("Form submitted successfully!")
       methods.reset()
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (error) {
       console.error("Error submitting form:", error)
-      toast.error("Failed to submit form. Please try again.")
+      let errorMessage = "Failed to submit form.";
+      
+      if (error instanceof Error) {
+        errorMessage += " " + error.message;
+      }
+      
+      toast.error(errorMessage, {
+        duration: 6000, // Show for longer (6 seconds)
+        description: "Please check the console for more details."
+      })
     }
   }
+
+  // Function to fill test data
+  const fillTestData = () => {
+    // Dummy data to fill all form fields for testing
+    const testData: FormData = {
+      basicInformation: {
+        leadId: "", // Empty lead ID for free input by the user
+        firstName: "Test",
+        lastName: "User",
+        email: "test@example.com",
+        dateOfBirth: "1990-01-01", // ISO format for dates
+        leadSource: "website"
+      },
+      healthInformation: {
+        currentlyInsured: true,
+        lastTimeInsured: "2023-01-01",
+        currentMedications: "Aspirin, Vitamin D, Lisinopril",
+        preExistingConditions: "Hypertension, Asthma",
+        majorHospitalizations: "Appendectomy 2018, Knee surgery 2020",
+        projectedAnnualIncome: "60000" // Currency field expecting number
+      },
+      insuranceDetails: {
+        insuranceState: "CA",
+        typeOfInsurance: "Individual",
+        carrierU65: "Blue Cross",
+        plan: "Premium Plan",
+        planCost: "350",
+        planCommission: "75",
+        carrierACA: "Ambetter",
+        acaPlanPremium: "450", // Currency field expecting number
+        acaPlanDeductible: "2500",
+        enrollmentFee: "100",
+        enrollmentFeeCommission: "20",
+        americanFinancial1Premium: "50",
+        americanFinancial1Commission: "15",
+        americanFinancial1Plan: "AF AD&D 50K $93.00", // Add plan name 
+        americanFinancial2Premium: "75",
+        americanFinancial2Commission: "20",
+        americanFinancial2Plan: "AF AME 500 $35.00", // Add plan name
+        americanFinancial3Premium: "125",
+        americanFinancial3Commission: "30",
+        americanFinancial3Plan: "AF Critical Illness (N/A FL,IA,LA,MD,MI,MO,MT,SC,TN,TX,WV,WY) 2,500 $64.00", // Add plan name
+        essentialCarePremium: "100",
+        essentialCareCommission: "25",
+        totalPremium: "1150",
+        totalCommission: "185",
+        hasAddons: true,
+        selectedAddons: ["Dental", "Vision"],
+        addonsCost: "75"
+      },
+      personalDetails: {
+        ssn: "123-45-6789",
+        gender: "male",
+        height: "72",
+        weight: "180",
+        smokerStatus: false
+      },
+      addressInformation: {
+        addressLine1: "123 Test Street",
+        addressLine2: "Apt 4B",
+        city: "Testville",
+        state: "CA",
+        zipCode: "12345" // Should be converted to number
+      },
+      contactNumbers: {
+        cellPhone: "(555) 123-4567",
+        workPhone: "(555) 987-6543"
+      },
+      dependentsInformation: [
+        {
+          name: "Test Child 1",
+          dob: "2010-05-15", // ISO format for dates
+          ssn: "987-65-4321",
+          gender: "female",
+          relationship: "child"
+        },
+        {
+          name: "Test Spouse",
+          dob: "1992-03-20", // ISO format for dates
+          ssn: "456-78-9123",
+          gender: "female",
+          relationship: "spouse"
+        },
+        {
+          name: "Test Child 2",
+          dob: "2012-07-19", // ISO format for dates
+          ssn: "444-55-6666",
+          gender: "male",
+          relationship: "child"
+        },
+        {
+          name: "Test Child 3",
+          dob: "2014-09-23", // ISO format for dates
+          ssn: "333-44-5555",
+          gender: "female",
+          relationship: "child"
+        },
+        {
+          name: "Test Child 4",
+          dob: "2016-11-12", // ISO format for dates
+          ssn: "222-33-4444",
+          gender: "male",
+          relationship: "child"
+        },
+        {
+          name: "Test Parent",
+          dob: "1965-02-28", // ISO format for dates
+          ssn: "111-22-3333",
+          gender: "male",
+          relationship: "parent"
+        }
+      ],
+      billingInformation: {
+        sameAsApplicant: false,
+        billingAddressLine1: "456 Billing Street",
+        billingAddressLine2: "Suite 100",
+        billingCity: "Billtown",
+        billingState: "NY",
+        billingZipCode: "54321", // Should be converted to number
+        cardType: "visa",
+        cardNumber: "4111111111111111",
+        expMonth: "12",
+        expYear: "2025",
+        cvv: "123" // Should be converted to number
+      },
+      agentInformation: {
+        agentName: "Agent Smith",
+        fronterName: "Jane Fronter",
+        notes: "Test submission with maximum data for comprehensive Airtable field testing"
+      }
+    };
+
+    // Set all form values at once
+    methods.reset(testData);
+    
+    // Show confirmation to user
+    toast.success("Test data populated successfully! All Airtable fields included with maximum dependents.", {
+      description: "Please enter your Lead ID before submitting"
+    });
+    
+    // Scroll to top to see the populated form and enter Lead ID
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    // Focus on the Lead ID field (requires basic-information component to expose the field)
+    setTimeout(() => {
+      const leadIdInput = document.querySelector('input[name="basicInformation.leadId"]');
+      if (leadIdInput) {
+        (leadIdInput as HTMLInputElement).focus();
+      }
+    }, 100);
+  };
+  
+  // Function to inspect current form data
+  const inspectFormData = () => {
+    const currentData = methods.getValues();
+    console.log('Current form data:', JSON.stringify(currentData, null, 2));
+    toast.info("Form data printed to console for inspection", {
+      description: "Check your browser's developer console (F12)"
+    });
+  };
 
   const sections = [
     { id: "basicInformation", label: "Basic Info", component: BasicInformation },
@@ -176,7 +346,26 @@ export default function InsuranceForm() {
 
         {/* Fixed Submit Button */}
         <div className="sticky bottom-0 bg-white shadow-lg p-4 border-t">
-          <div className="container mx-auto flex justify-end">
+          <div className="container mx-auto flex justify-between">
+            {/* Test buttons */}
+            <div className="flex space-x-2">
+              <Button 
+                type="button" 
+                onClick={fillTestData}
+                className="bg-gray-600 hover:bg-gray-700 px-6 py-2"
+              >
+                Fill Test Data
+              </Button>
+              
+              <Button 
+                type="button" 
+                onClick={inspectFormData}
+                className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
+              >
+                Inspect Data
+              </Button>
+            </div>
+            
             <Button 
               type="submit" 
               className="bg-primary hover:bg-primary/90 px-6 py-2"

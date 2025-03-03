@@ -16,7 +16,9 @@ export default function BillingInformation() {
         render={({ field }) => (
           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
-              <FormLabel className="text-base">Same as Applicant Address</FormLabel>
+              <FormLabel className="text-base">
+                Same as Applicant Address <sub className="text-xs text-gray-500">[Airtable: Billing Info same as Applicant]</sub>
+              </FormLabel>
             </div>
             <FormControl>
               <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -31,7 +33,9 @@ export default function BillingInformation() {
             name="billingInformation.billingAddressLine1"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Billing Address Line 1</FormLabel>
+                <FormLabel>
+                  Billing Address Line 1 <sub className="text-xs text-gray-500">[Airtable: Billing Address Line 1]</sub>
+                </FormLabel>
                 <FormControl>
                   <Input {...field} />
                 </FormControl>
@@ -44,7 +48,9 @@ export default function BillingInformation() {
             name="billingInformation.billingAddressLine2"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Billing Address Line 2 (Optional)</FormLabel>
+                <FormLabel>
+                  Billing Address Line 2 (Optional) <sub className="text-xs text-gray-500">[Airtable: Billing Address Line 2]</sub>
+                </FormLabel>
                 <FormControl>
                   <Input {...field} />
                 </FormControl>
@@ -57,7 +63,9 @@ export default function BillingInformation() {
             name="billingInformation.billingCity"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Billing City</FormLabel>
+                <FormLabel>
+                  Billing City <sub className="text-xs text-gray-500">[Airtable: Billing City]</sub>
+                </FormLabel>
                 <FormControl>
                   <Input {...field} />
                 </FormControl>
@@ -70,7 +78,9 @@ export default function BillingInformation() {
             name="billingInformation.billingState"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Billing State</FormLabel>
+                <FormLabel>
+                  Billing State <sub className="text-xs text-gray-500">[Airtable: Billing State]</sub>
+                </FormLabel>
                 <Select onValueChange={field.onChange} defaultValue={field.value}>
                   <FormControl>
                     <SelectTrigger>
@@ -143,7 +153,9 @@ export default function BillingInformation() {
             name="billingInformation.billingZipCode"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Billing ZIP Code</FormLabel>
+                <FormLabel>
+                  Billing ZIP Code <sub className="text-xs text-gray-500">[Airtable: Billing Zip]</sub>
+                </FormLabel>
                 <FormControl>
                   <Input {...field} placeholder="XXXXX" />
                 </FormControl>
@@ -158,7 +170,9 @@ export default function BillingInformation() {
         name="billingInformation.cardType"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Card Type</FormLabel>
+            <FormLabel>
+              Card Type <sub className="text-xs text-gray-500">[Airtable: Card Type]</sub>
+            </FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger>
@@ -181,7 +195,9 @@ export default function BillingInformation() {
         name="billingInformation.cardNumber"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Card Number</FormLabel>
+            <FormLabel>
+              Card Number <sub className="text-xs text-gray-500">[Airtable: Card Number]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="XXXX-XXXX-XXXX-XXXX" />
             </FormControl>
@@ -196,7 +212,9 @@ export default function BillingInformation() {
           name="billingInformation.expMonth"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Exp. Month</FormLabel>
+              <FormLabel>
+                Exp. Month <sub className="text-xs text-gray-500">[Airtable: Exp. Month]</sub>
+              </FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -220,7 +238,9 @@ export default function BillingInformation() {
           name="billingInformation.expYear"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Exp. Year</FormLabel>
+              <FormLabel>
+                Exp. Year <sub className="text-xs text-gray-500">[Airtable: Exp. Year]</sub>
+              </FormLabel>
               <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
@@ -244,7 +264,9 @@ export default function BillingInformation() {
           name="billingInformation.cvv"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>CVV</FormLabel>
+              <FormLabel>
+                CVV <sub className="text-xs text-gray-500">[Airtable: CVV]</sub>
+              </FormLabel>
               <FormControl>
                 <Input {...field} placeholder="XXX" maxLength={4} />
               </FormControl>

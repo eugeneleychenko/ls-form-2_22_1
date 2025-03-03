@@ -13,7 +13,7 @@ export default function AgentInformation() {
         name="agentInformation.agentName"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Agent Name</FormLabel>
+            <FormLabel>Agent Name <sub>[Airtable: Agent Name]</sub></FormLabel>
             <FormControl>
               <Input {...field} />
             </FormControl>
@@ -26,7 +26,7 @@ export default function AgentInformation() {
         name="agentInformation.fronterName"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Fronter Name</FormLabel>
+            <FormLabel>Fronter Name <sub>[Airtable: Fronter Name]</sub></FormLabel>
             <FormControl>
               <Input {...field} />
             </FormControl>
@@ -39,7 +39,7 @@ export default function AgentInformation() {
         name="agentInformation.notes"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Notes</FormLabel>
+            <FormLabel>Notes <sub>[Airtable: Notes]</sub></FormLabel>
             <FormControl>
               <Textarea placeholder="Enter any additional notes here" className="min-h-[100px]" {...field} />
             </FormControl>

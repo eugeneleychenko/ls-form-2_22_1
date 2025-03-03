@@ -14,7 +14,9 @@ export default function PersonalDetails() {
         name="personalDetails.ssn"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>SSN</FormLabel>
+            <FormLabel>
+              SSN <sub className="text-xs text-gray-500">[Airtable: SSN]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="XXX-XX-XXXX" />
             </FormControl>
@@ -27,7 +29,9 @@ export default function PersonalDetails() {
         name="personalDetails.gender"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Gender</FormLabel>
+            <FormLabel>
+              Gender <sub className="text-xs text-gray-500">[Airtable: Gender]</sub>
+            </FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger>
@@ -49,7 +53,9 @@ export default function PersonalDetails() {
         name="personalDetails.height"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Height</FormLabel>
+            <FormLabel>
+              Height <sub className="text-xs text-gray-500">[Airtable: Height]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="Height in inches" />
             </FormControl>
@@ -62,7 +68,9 @@ export default function PersonalDetails() {
         name="personalDetails.weight"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Weight</FormLabel>
+            <FormLabel>
+              Weight <sub className="text-xs text-gray-500">[Airtable: Weight]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="Weight in pounds" />
             </FormControl>
@@ -76,7 +84,9 @@ export default function PersonalDetails() {
         render={({ field }) => (
           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
-              <FormLabel className="text-base">Smoker Status</FormLabel>
+              <FormLabel className="text-base">
+                Smoker Status <sub className="text-xs text-gray-500">[Airtable: Smoker?]</sub>
+              </FormLabel>
             </div>
             <FormControl>
               <Switch checked={field.value} onCheckedChange={field.onChange} />

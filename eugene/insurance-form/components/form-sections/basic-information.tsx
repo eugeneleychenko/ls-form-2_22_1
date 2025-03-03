@@ -14,11 +14,13 @@ export default function BasicInformation() {
         name="basicInformation.leadId"
         render={({ field }) => (
           <FormItem>
-            <FormLabel required>Lead ID *</FormLabel>
+            <FormLabel required>
+              Lead ID * <sub className="text-xs text-gray-500">[Airtable: Lead ID]</sub>
+            </FormLabel>
             <FormControl>
               <Input
-                type="number"
-                placeholder="Enter Lead ID (Required)"
+                type="text"
+                placeholder="Enter Lead ID (Required, free-form)"
                 {...field}
                 className="border-gray-300 focus:border-primary focus:ring-primary"
               />
@@ -32,7 +34,9 @@ export default function BasicInformation() {
         name="basicInformation.firstName"
         render={({ field }) => (
           <FormItem>
-            <FormLabel required>First Name *</FormLabel>
+            <FormLabel required>
+              First Name * <sub className="text-xs text-gray-500">[Airtable: firstName]</sub>
+            </FormLabel>
             <FormControl>
               <Input
                 placeholder="Enter First Name (Required)"
@@ -49,7 +53,9 @@ export default function BasicInformation() {
         name="basicInformation.lastName"
         render={({ field }) => (
           <FormItem>
-            <FormLabel required>Last Name *</FormLabel>
+            <FormLabel required>
+              Last Name * <sub className="text-xs text-gray-500">[Airtable: lastName]</sub>
+            </FormLabel>
             <FormControl>
               <Input
                 placeholder="Enter Last Name (Required)"
@@ -66,7 +72,9 @@ export default function BasicInformation() {
         name="basicInformation.email"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Email</FormLabel>
+            <FormLabel>
+              Email <sub className="text-xs text-gray-500">[Airtable: email]</sub>
+            </FormLabel>
             <FormControl>
               <Input
                 type="email"
@@ -84,7 +92,9 @@ export default function BasicInformation() {
         name="basicInformation.dateOfBirth"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Date of Birth</FormLabel>
+            <FormLabel>
+              Date of Birth <sub className="text-xs text-gray-500">[Airtable: DOB]</sub>
+            </FormLabel>
             <FormControl>
               <Input 
                 type="date" 
@@ -102,7 +112,9 @@ export default function BasicInformation() {
         name="basicInformation.leadSource"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Lead Source</FormLabel>
+            <FormLabel>
+              Lead Source <sub className="text-xs text-gray-500">[Airtable: Lead Source]</sub>
+            </FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">

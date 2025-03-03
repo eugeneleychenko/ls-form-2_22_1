@@ -21,9 +21,25 @@ export interface FormData {
     carrierU65?: string;
     plan?: string;
     planCost?: string;
+    planCommission?: string;
     carrierACA?: string;
     acaPlanPremium?: string;
     acaPlanDeductible?: string;
+    enrollmentFee?: string;
+    enrollmentFeeCommission?: string;
+    americanFinancial1Premium?: string;
+    americanFinancial1Commission?: string;
+    americanFinancial1Plan?: string;
+    americanFinancial2Premium?: string;
+    americanFinancial2Commission?: string;
+    americanFinancial2Plan?: string;
+    americanFinancial3Premium?: string;
+    americanFinancial3Commission?: string;
+    americanFinancial3Plan?: string;
+    essentialCarePremium?: string;
+    essentialCareCommission?: string;
+    totalPremium?: string;
+    totalCommission?: string;
     hasAddons?: boolean;
     selectedAddons?: string[];
     addonsCost?: string;
@@ -62,6 +78,9 @@ export interface FormData {
     billingZipCode?: string;
     cardType?: string;
     cardNumber?: string;
+    expMonth?: string;
+    expYear?: string;
+    cvv?: string;
   };
   agentInformation?: {
     agentName?: string;

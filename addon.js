@@ -23,7 +23,8 @@ function fetchAddons() {
         record.fields.Carriers.includes('American Financial') || 
         record.fields.Carriers.includes('Essential Care Individual') ||
         record.fields.Carriers.includes('AMT Addons') ||
-        record.fields.Carriers.includes('Leo Addons')
+        record.fields.Carriers.includes('Leo Addons') ||
+        record.fields.Carriers.includes('Addons') // Catch any carrier with "Addons" in the name
       );
       
       if (isAddon) {
@@ -46,6 +47,16 @@ function fetchAddons() {
         } else if (record.fields.Carriers.includes('Leo Addons')) {
           addonType = 'Leo';
           addonNumber = '1';
+        } else {
+          // Extract addon type from the carrier name for any other carriers
+          const carrierName = record.fields.Carriers;
+          // Try to extract the type (text before "Addons" or before a number)
+          const typeMatch = carrierName.match(/^(.*?)\s+(?:Addons|\d)/i);
+          addonType = typeMatch ? typeMatch[1].trim() : 'Other';
+          
+          // Try to extract the number if present
+          const numberMatch = carrierName.match(/\s+(\d+)\s*$/);
+          addonNumber = numberMatch ? numberMatch[1] : '1';
         }
         
         allAddons.push({
@@ -57,38 +68,36 @@ function fetchAddons() {
           plans: []
         });
         
-        // Add plans if they exist
-        if (record.fields['Plan 1'] && record.fields['Plan 1 Cost']) {
-          // Clean up the plan name and cost
-          const planName = record.fields['Plan 1'].replace(/\s+/g, ' ').trim();
-          const planCost = record.fields['Plan 1 Cost'].replace(/\$+/g, '').trim();
+        // Process all plans from 1 to 11
+        for (let i = 1; i <= 11; i++) {
+          const planField = `Plan ${i}`;
+          const costField = `Plan ${i} Cost`;
+          const commissionField = `Plan ${i} Commission`;
           
-          allAddons[allAddons.length - 1].plans.push({
-            name: cleanPlanName(planName),
-            cost: planCost
-          });
-        }
-        
-        if (record.fields['Plan 2'] && record.fields['Plan 2 Cost']) {
-          // Clean up the plan name and cost
-          const planName = record.fields['Plan 2'].replace(/\s+/g, ' ').trim();
-          const planCost = record.fields['Plan 2 Cost'].replace(/\$+/g, '').trim();
-          
-          allAddons[allAddons.length - 1].plans.push({
-            name: cleanPlanName(planName),
-            cost: planCost
-          });
-        }
-        
-        if (record.fields['Plan 3'] && record.fields['Plan 3 Cost']) {
-          // Clean up the plan name and cost
-          const planName = record.fields['Plan 3'].replace(/\s+/g, ' ').trim();
-          const planCost = record.fields['Plan 3 Cost'].replace(/\$+/g, '').trim();
-          
-          allAddons[allAddons.length - 1].plans.push({
-            name: cleanPlanName(planName),
-            cost: planCost
-          });
+          if (record.fields[planField] && record.fields[costField]) {
+            // Clean up the plan name and cost
+            const planName = record.fields[planField].replace(/\s+/g, ' ').trim();
+            const planCost = record.fields[costField].replace(/\$+/g, '').trim();
+            // Get commission if available
+            let planCommission = '0';
+            if (record.fields[commissionField]) {
+              const commissionValue = record.fields[commissionField];
+              if (typeof commissionValue === 'string') {
+                planCommission = commissionValue.replace(/\$+/g, '').trim();
+              } else if (typeof commissionValue === 'number') {
+                planCommission = commissionValue.toString();
+              } else {
+                planCommission = '0';
+              }
+            }
+            
+            allAddons[allAddons.length - 1].plans.push({
+              name: cleanPlanName(planName),
+              cost: planCost,
+              commission: planCommission,
+              planNumber: i.toString()
+            });
+          }
         }
       }
     });
@@ -114,7 +123,7 @@ function fetchAddons() {
         console.log(`  ${addon.name}:`);
         
         addon.plans.forEach(plan => {
-          console.log(`    - ${plan.name}: $${plan.cost}`);
+          console.log(`    - ${plan.name}: $${plan.cost} (Commission: ${plan.commission || '0'})`);
         });
       });
     }
@@ -172,7 +181,7 @@ function fetchAddons() {
       });
       
       uniquePlans.forEach(plan => {
-        console.log(`    - ${plan.name}: $${plan.cost}`);
+        console.log(`    - ${plan.name}: $${plan.cost} (Commission: ${plan.commission || '0'})`);
       });
     }
     
@@ -184,12 +193,19 @@ function fetchAddons() {
       'American Financial': [],
       'Essential Care': [],
       'AMT': [],
-      'Leo': []
+      'Leo': [],
+      'Other': []  // Add category for other carriers
     };
     
     allAddons.forEach(addon => {
-      if (addon.addonType && addonsByCarrier[addon.addonType]) {
-        addonsByCarrier[addon.addonType].push(addon);
+      if (addon.addonType) {
+        // If the carrier type exists in our predefined categories, use it
+        if (addonsByCarrier[addon.addonType]) {
+          addonsByCarrier[addon.addonType].push(addon);
+        } else {
+          // If not, add to 'Other'
+          addonsByCarrier['Other'].push(addon);
+        }
       }
     });
     
@@ -205,7 +221,7 @@ function fetchAddons() {
           console.log(`  ${addon.name}:`);
           
           addon.plans.forEach(plan => {
-            console.log(`    - ${plan.name}: $${plan.cost}`);
+            console.log(`    - ${plan.name}: $${plan.cost} (Commission: ${plan.commission || '0'})`);
           });
         });
       }

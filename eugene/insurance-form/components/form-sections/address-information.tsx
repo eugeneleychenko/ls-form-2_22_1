@@ -13,7 +13,9 @@ export default function AddressInformation() {
         name="addressInformation.addressLine1"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Address Line 1</FormLabel>
+            <FormLabel>
+              Address Line 1 <sub className="text-xs text-gray-500">[Airtable: Address Line 1]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} />
             </FormControl>
@@ -26,7 +28,9 @@ export default function AddressInformation() {
         name="addressInformation.addressLine2"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Address Line 2 (Optional)</FormLabel>
+            <FormLabel>
+              Address Line 2 (Optional) <sub className="text-xs text-gray-500">[Airtable: Address Line 2]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} />
             </FormControl>
@@ -39,7 +43,9 @@ export default function AddressInformation() {
         name="addressInformation.city"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>City</FormLabel>
+            <FormLabel>
+              City <sub className="text-xs text-gray-500">[Airtable: City]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} />
             </FormControl>
@@ -52,7 +58,9 @@ export default function AddressInformation() {
         name="addressInformation.state"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>State</FormLabel>
+            <FormLabel>
+              State <sub className="text-xs text-gray-500">[Airtable: State]</sub>
+            </FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger>
@@ -123,7 +131,9 @@ export default function AddressInformation() {
         name="addressInformation.zipCode"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>ZIP Code</FormLabel>
+            <FormLabel>
+              ZIP Code <sub className="text-xs text-gray-500">[Airtable: Zip]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="XXXXX" />
             </FormControl>

@@ -12,7 +12,9 @@ export default function ContactNumbers() {
         name="contactNumbers.cellPhone"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Cell Phone</FormLabel>
+            <FormLabel>
+              Cell Phone <sub className="text-xs text-gray-500">[Airtable: Cell Phone]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="(XXX) XXX-XXXX" />
             </FormControl>
@@ -25,7 +27,9 @@ export default function ContactNumbers() {
         name="contactNumbers.workPhone"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Work Phone (Optional)</FormLabel>
+            <FormLabel>
+              Work Phone (Optional) <sub className="text-xs text-gray-500">[Airtable: Work Phone]</sub>
+            </FormLabel>
             <FormControl>
               <Input {...field} placeholder="(XXX) XXX-XXXX" />
             </FormControl>

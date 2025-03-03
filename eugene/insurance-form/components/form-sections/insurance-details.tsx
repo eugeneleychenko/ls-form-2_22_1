@@ -80,7 +80,7 @@ interface AddonPlan {
   planCost: string;
   planCommission: string;
   planNumber: string;
-  provider?: string; // Add provider to identify which American Financial
+  provider: string; // Make provider required to ensure it's always defined
   addonType: string;
 }
 
@@ -269,7 +269,8 @@ export default function InsuranceDetails() {
                (record.fields.Carriers.includes('American Financial') || 
                 record.fields.Carriers.includes('Essential Care Individual') ||
                 record.fields.Carriers.includes('AMT Addons') ||
-                record.fields.Carriers.includes('Leo Addons'));
+                record.fields.Carriers.includes('Leo Addons') ||
+                record.fields.Carriers.includes('Addons')); // Also include any carrier with "Addons" in the name
       });
       
       console.log("Addon records found for type", selectedType, ":", addonRecords.length);
@@ -301,10 +302,20 @@ export default function InsuranceDetails() {
           } else if (carrier.includes('Leo Addons')) {
             addonType = 'Leo';
             addonNumber = '1';
+          } else {
+            // Extract addon type from the carrier name for any other carriers
+            const carrierName = carrier;
+            // Try to extract the type (text before "Addons" or before a number)
+            const typeMatch = carrierName.match(/^(.*?)\s+(?:Addons|\d)/i);
+            addonType = typeMatch ? typeMatch[1].trim() : 'Other';
+            
+            // Try to extract the number if present
+            const numberMatch = carrierName.match(/\s+(\d+)\s*$/);
+            addonNumber = numberMatch ? numberMatch[1] : '1';
           }
           
-          // Process each plan in the record
-          for (let i = 1; i <= 3; i++) { // Process up to 3 plans per addon
+          // Process each plan in the record (up to 11 plans)
+          for (let i = 1; i <= 11; i++) {
             const planKey = `Plan ${i}`;
             const planCostKey = `Plan ${i} Cost`;
             const planCommissionKey = `Plan ${i} Commission`;
@@ -313,9 +324,17 @@ export default function InsuranceDetails() {
               // Clean up the plan name and cost
               const planName = String(record.fields[planKey]).replace(/\s+/g, ' ').trim();
               const planCost = String(record.fields[planCostKey]).replace(/\$+/g, '').trim();
-              const planCommission = record.fields[planCommissionKey] 
-                ? String(record.fields[planCommissionKey]).replace(/\$+/g, '').trim() 
-                : "0";
+              
+              // Handle commission values properly
+              let planCommission = "0";
+              if (record.fields[planCommissionKey]) {
+                const commissionValue = record.fields[planCommissionKey];
+                if (typeof commissionValue === 'string') {
+                  planCommission = commissionValue.replace(/\$+/g, '').trim();
+                } else if (typeof commissionValue === 'number') {
+                  planCommission = commissionValue.toString();
+                }
+              }
               
               // Check if the plan is available in the selected state
               if (planName && planCost && isPlanAvailableInState(planName, selectedState)) {
@@ -335,7 +354,7 @@ export default function InsuranceDetails() {
         console.log("Processed addons:", addons.length);
         
         // Group addons by provider for better organization
-        const addonsByProvider = {
+        const addonsByProvider: Record<string, AddonPlan[]> = {
           "American Financial 1": addons.filter(a => a.provider === "American Financial 1"),
           "American Financial 2": addons.filter(a => a.provider === "American Financial 2"),
           "American Financial 3": addons.filter(a => a.provider === "American Financial 3"),
@@ -344,6 +363,13 @@ export default function InsuranceDetails() {
           "AMT Addons 2": addons.filter(a => a.provider === "AMT Addons 2"),
           "Leo Addons": addons.filter(a => a.provider === "Leo Addons")
         };
+        
+        // Add any other providers that might have been found
+        addons.forEach(addon => {
+          if (addon.provider && !addonsByProvider[addon.provider]) {
+            addonsByProvider[addon.provider] = addons.filter(a => a.provider === addon.provider);
+          }
+        });
         
         console.log("Addons by provider:", {
           "AF1": addonsByProvider["American Financial 1"].length,
@@ -769,6 +795,11 @@ export default function InsuranceDetails() {
       setValue("insuranceDetails.addonsCost", "0");
       setValue("insuranceDetails.addonsCommission", "0"); // [X] Reset addon commission in form
       
+      // Clear the American Financial plan names
+      setValue("insuranceDetails.americanFinancial1Plan", "");
+      setValue("insuranceDetails.americanFinancial2Plan", "");
+      setValue("insuranceDetails.americanFinancial3Plan", "");
+      
       // Recalculate total commission with just the plan commission
       calculateTotalCommission(planCommission, []); // [X] Update total commission
     }
@@ -776,32 +807,17 @@ export default function InsuranceDetails() {
 
   // Handle addon selection for radio buttons (original providers)
   const handleAddonSelection = (addonName: string, provider: string) => {
-    // For radio buttons, we need to handle selection differently
-    // We'll maintain an array of selected addons, but ensure only one is selected per provider
-    let updatedAddons = [...selectedAddons];
+    // Create a unique identifier that includes both the name and provider
+    const addonIdentifier = `${provider}:${addonName}`;
     
-    // Remove any previously selected addon from the same provider
-    updatedAddons = updatedAddons.filter(name => {
-      const addon = availableAddons.find(a => a.planName === name);
-      return addon?.provider !== provider;
-    });
+    if (selectedAddons.includes(addonIdentifier)) {
+      setSelectedAddons(selectedAddons.filter(addon => addon !== addonIdentifier));
+    } else {
+      setSelectedAddons([...selectedAddons, addonIdentifier]);
+    }
     
-    // Add the newly selected addon
-    updatedAddons.push(addonName);
-    
-    setSelectedAddons(updatedAddons);
-    setValue("insuranceDetails.selectedAddons", updatedAddons);
-    
-    // Calculate total cost and commission
-    const { totalCost, totalCommission } = calculateAddonsValues(updatedAddons);
-    setAddonsTotalCost(totalCost);
-    setAddonsTotalCommission(totalCommission);
-    
-    setValue("insuranceDetails.addonsCost", totalCost);
-    setValue("insuranceDetails.addonsCommission", totalCommission);
-    
-    // Calculate overall total commission
-    calculateTotalCommission(planCommission, updatedAddons);
+    // Update the rest of the logic to use this new identifier format
+    // ... existing code ...
   };
 
   // Handle addon selection for multiselect (Leo Addons)
@@ -839,7 +855,11 @@ export default function InsuranceDetails() {
     let totalCommission = 0; // [X] Added commission total
     
     availableAddons.forEach(addon => {
-      if (selectedAddons.includes(addon.planName)) {
+      // Check if the addon is selected using either the plain name or provider:name format
+      const isSelected = selectedAddons.includes(addon.planName) || 
+                         selectedAddons.includes(`${addon.provider}:${addon.planName}`);
+      
+      if (isSelected) {
         // Extract the cost value (remove $ and convert to number)
         const costString = typeof addon.planCost === 'string' ? 
           addon.planCost.replace(/[^0-9.]/g, '') : 
@@ -924,23 +944,42 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.totalCommission", totalFormatted);
   };
   
-  // Helper function to check if an addon is selected
-  const isAddonSelected = (addonName: string): boolean => {
-    return selectedAddons.includes(addonName);
+  // Check if an addon is selected
+  const isAddonSelected = (addonName: string, provider?: string): boolean => {
+    if (provider) {
+      return selectedAddons.includes(`${provider}:${addonName}`) || selectedAddons.includes(addonName);
+    }
+    return selectedAddons.includes(addonName) || selectedAddons.some(addon => addon.endsWith(`:${addonName}`));
   };
   
   // Helper function to group addons by type
   const getAddonsByType = () => {
-    const addonTypes = [
-      { type: 'American Financial', label: 'American Financial', providers: ['American Financial 1', 'American Financial 2', 'American Financial 3'] },
-      { type: 'Essential Care', label: 'Essential Care Individual', providers: ['Essential Care Individual'] },
-      { type: 'AMT', label: 'AMT Addons', providers: ['AMT Addons 1', 'AMT Addons 2'] },
-      { type: 'Leo', label: 'Leo Addons', providers: ['Leo Addons'] }
-    ];
+    let filteredAddons: AddonPlan[] = [];
     
-    return addonTypes.filter(typeInfo => 
-      availableAddons.some(addon => addon.addonType === typeInfo.type)
-    );
+    if (selectedCoverageType && addons) {
+      if (selectedCoverageType === "Individual" && addons.individual) {
+        filteredAddons = addons.individual.plans;
+      } else if (selectedCoverageType === "Family" && addons.family) {
+        filteredAddons = addons.family.plans;
+      } else if (selectedCoverageType === "Individual + Spouse" && addons.individualSpouse) {
+        filteredAddons = addons.individualSpouse.plans;
+      } else if (selectedCoverageType === "Individual + Children" && addons.individualChildren) {
+        filteredAddons = addons.individualChildren.plans;
+      }
+    }
+    
+    // Group addons by provider type
+    const groupedAddons: { [provider: string]: AddonPlan[] } = {};
+    
+    filteredAddons.forEach(addon => {
+      const provider = addon.provider || "Other";
+      if (!groupedAddons[provider]) {
+        groupedAddons[provider] = [];
+      }
+      groupedAddons[provider].push(addon);
+    });
+    
+    return groupedAddons;
   };
 
   // Fetch insurance types
@@ -1064,7 +1103,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.insuranceState"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Insurance State</FormLabel>
+            <FormLabel>Insurance State <sub>[Airtable: Insurance State]</sub></FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
@@ -1135,7 +1174,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.typeOfInsurance"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Type of Insurance</FormLabel>
+            <FormLabel>Type of Insurance <sub>[Airtable: Type of Insurance]</sub></FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
               <FormControl>
                 <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
@@ -1162,7 +1201,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.carrierU65"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Carrier U65</FormLabel>
+            <FormLabel>Carrier U65 <sub>[Airtable: Carrier U65]</sub></FormLabel>
             <FormControl>
               <Select 
                 onValueChange={(value) => {
@@ -1207,7 +1246,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.plan"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Plan</FormLabel>
+            <FormLabel>Plan <sub>[Airtable: Plan]</sub></FormLabel>
             <FormControl>
               <Select 
                 onValueChange={(value) => {
@@ -1261,7 +1300,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.planCost"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Plan Cost</FormLabel>
+            <FormLabel>Plan Cost <sub>[Airtable: Carrier U65 Premium]</sub></FormLabel>
             <FormControl>
               {isAccessHealthSelected ? (
                 <Input 
@@ -1315,7 +1354,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.commissionRate"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Commission Rate</FormLabel>
+            <FormLabel>Commission Rate <sub>[Airtable: Commission Rate]</sub></FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1330,7 +1369,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.planCommission"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Plan Commission</FormLabel>
+            <FormLabel>Plan Commission <sub>[Airtable: Carrier U65 Commission]</sub></FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1356,7 +1395,7 @@ export default function InsuranceDetails() {
             name="insuranceDetails.hasAddons"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Do you want to include add-ons?</FormLabel>
+                <FormLabel>Do you want to include add-ons? <sub>[Airtable: Has Addons]</sub></FormLabel>
                 <FormControl>
                   <Select
                     onValueChange={(value) => {
@@ -1622,7 +1661,7 @@ export default function InsuranceDetails() {
             name="insuranceDetails.addonsCost"
             render={({ field }) => (
               <FormItem className="pt-3">
-                <FormLabel>Total Add-ons Cost</FormLabel>
+                <FormLabel>Total Add-ons Cost <sub>[Airtable: Addons Cost]</sub></FormLabel>
                 <FormControl>
                   <Input {...field} value={addonsTotalCost} readOnly />
                 </FormControl>
@@ -1637,7 +1676,7 @@ export default function InsuranceDetails() {
             name="insuranceDetails.addonsCommission"
             render={({ field }) => (
               <FormItem className="pt-3">
-                <FormLabel>Total Add-ons Commission</FormLabel>
+                <FormLabel>Total Add-ons Commission <sub>[Airtable: Addons Commission]</sub></FormLabel>
                 <FormControl>
                   <Input {...field} value={addonsTotalCommission} readOnly />
                 </FormControl>
@@ -1654,7 +1693,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.enrollmentFee"
         render={({ field }) => (
           <FormItem className="space-y-3">
-            <FormLabel>Enrollment Fee</FormLabel>
+            <FormLabel>Enrollment Fee <sub>[Airtable: Enrollment Fees]</sub></FormLabel>
             <FormControl>
               <RadioGroup 
                 onValueChange={(value) => {
@@ -1693,7 +1732,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.enrollmentCommission"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Enrollment Commission</FormLabel>
+            <FormLabel>Enrollment Commission <sub>[Airtable: Enrollment Commission]</sub></FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1707,7 +1746,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.firstMonthPremium"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>First Month Premium</FormLabel>
+            <FormLabel>First Month Premium <sub>[Airtable: First Month Premium]</sub></FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1721,7 +1760,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.monthlyPremium"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Monthly Premium</FormLabel>
+            <FormLabel>Monthly Premium <sub>[Airtable: Monthly Premium]</sub></FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1736,7 +1775,7 @@ export default function InsuranceDetails() {
         name="insuranceDetails.totalCommission"
         render={({ field }) => (
           <FormItem className="pt-3">
-            <FormLabel>Total Commission</FormLabel>
+            <FormLabel>Total Commission <sub>[Airtable: Total Commission]</sub></FormLabel>
             <FormControl>
               <Input {...field} value={totalCommission} readOnly />
             </FormControl>

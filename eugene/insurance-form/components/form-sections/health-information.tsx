@@ -15,7 +15,9 @@ export default function HealthInformation() {
         render={({ field }) => (
           <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
             <div className="space-y-0.5">
-              <FormLabel className="text-base">Currently Insured</FormLabel>
+              <FormLabel className="text-base">
+                Currently Insured <sub className="text-xs text-gray-500">[Airtable: Currently Insured]</sub>
+              </FormLabel>
             </div>
             <FormControl>
               <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -28,7 +30,9 @@ export default function HealthInformation() {
         name="healthInformation.lastTimeInsured"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Last Time Insured</FormLabel>
+            <FormLabel>
+              Last Time Insured <sub className="text-xs text-gray-500">[Airtable: Last Time Insured]</sub>
+            </FormLabel>
             <FormControl>
               <Input type="date" {...field} />
             </FormControl>
@@ -41,7 +45,9 @@ export default function HealthInformation() {
         name="healthInformation.currentMedications"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Current Medications</FormLabel>
+            <FormLabel>
+              Current Medications <sub className="text-xs text-gray-500">[Airtable: Current Medications]</sub>
+            </FormLabel>
             <FormControl>
               <Textarea
                 placeholder="List your current medications"
@@ -58,7 +64,9 @@ export default function HealthInformation() {
         name="healthInformation.preExistingConditions"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Pre-existing Conditions</FormLabel>
+            <FormLabel>
+              Pre-existing Conditions <sub className="text-xs text-gray-500">[Airtable: Pre Existing Conditions]</sub>
+            </FormLabel>
             <FormControl>
               <Textarea
                 placeholder="List any pre-existing conditions"
@@ -75,7 +83,9 @@ export default function HealthInformation() {
         name="healthInformation.majorHospitalizations"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Major Hospitalizations/Surgeries</FormLabel>
+            <FormLabel>
+              Major Hospitalizations/Surgeries <sub className="text-xs text-gray-500">[Airtable: Major Hospitalizations/Surgeries]</sub>
+            </FormLabel>
             <FormControl>
               <Textarea
                 placeholder="List any major hospitalizations or surgeries"
@@ -92,7 +102,9 @@ export default function HealthInformation() {
         name="healthInformation.projectedAnnualIncome"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Projected Annual Income</FormLabel>
+            <FormLabel>
+              Projected Annual Income <sub className="text-xs text-gray-500">[Airtable: Projected Annual Income]</sub>
+            </FormLabel>
             <FormControl>
               <Input type="number" placeholder="Enter projected annual income" {...field} />
             </FormControl>
