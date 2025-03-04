@@ -90,6 +90,11 @@ export interface FormData {
     expMonth?: string;
     expYear?: string;
     cvv?: string;
+    bankAch?: boolean;
+    bankName?: string;
+    accountType?: string;
+    routingNumber?: string;
+    accountNumber?: string;
   };
   agentInformation?: {
     agentName?: string;

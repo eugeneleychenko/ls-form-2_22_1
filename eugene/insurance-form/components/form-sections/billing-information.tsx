@@ -7,6 +7,7 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 export default function BillingInformation() {
   const { control, watch } = useFormContext()
   const sameAsApplicant = watch("billingInformation.sameAsApplicant")
+  const bankAch = watch("billingInformation.bankAch")
 
   return (
     <div className="space-y-4">
@@ -167,114 +168,209 @@ export default function BillingInformation() {
       )}
       <FormField
         control={control}
-        name="billingInformation.cardType"
+        name="billingInformation.bankAch"
         render={({ field }) => (
-          <FormItem>
-            <FormLabel>
-              Card Type <sub className="text-xs text-gray-500">[Airtable: Card Type]</sub>
-            </FormLabel>
-            <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select card type" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="visa">Visa</SelectItem>
-                <SelectItem value="mastercard">Mastercard</SelectItem>
-                <SelectItem value="amex">American Express</SelectItem>
-                <SelectItem value="discover">Discover</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={control}
-        name="billingInformation.cardNumber"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>
-              Card Number <sub className="text-xs text-gray-500">[Airtable: Card Number]</sub>
-            </FormLabel>
+          <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+            <div className="space-y-0.5">
+              <FormLabel className="text-base">
+                Use Bank Transfer (ACH) <sub className="text-xs text-gray-500">[Airtable: Bank ACH?]</sub>
+              </FormLabel>
+            </div>
             <FormControl>
-              <Input {...field} placeholder="XXXX-XXXX-XXXX-XXXX" />
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
             </FormControl>
-            <FormMessage />
           </FormItem>
         )}
       />
-      
-      <div className="grid grid-cols-3 gap-4">
-        <FormField
-          control={control}
-          name="billingInformation.expMonth"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Exp. Month <sub className="text-xs text-gray-500">[Airtable: Exp. Month]</sub>
-              </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+
+      {bankAch ? (
+        <>
+          <FormField
+            control={control}
+            name="billingInformation.bankName"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Bank Name <sub className="text-xs text-gray-500">[Airtable: Bank Name]</sub>
+                </FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="MM" />
-                  </SelectTrigger>
+                  <Input {...field} />
                 </FormControl>
-                <SelectContent>
-                  {Array.from({ length: 12 }, (_, i) => {
-                    const month = (i + 1).toString().padStart(2, '0');
-                    return <SelectItem key={month} value={month}>{month}</SelectItem>;
-                  })}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={control}
-          name="billingInformation.expYear"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                Exp. Year <sub className="text-xs text-gray-500">[Airtable: Exp. Year]</sub>
-              </FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={control}
+            name="billingInformation.accountType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Account Type <sub className="text-xs text-gray-500">[Airtable: Account Type]</sub>
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select account type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="checking">Checking</SelectItem>
+                    <SelectItem value="savings">Savings</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={control}
+            name="billingInformation.routingNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Routing Number <sub className="text-xs text-gray-500">[Airtable: Routing Number]</sub>
+                </FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="YYYY" />
-                  </SelectTrigger>
+                  <Input {...field} placeholder="XXXXXXXXX" />
                 </FormControl>
-                <SelectContent>
-                  {Array.from({ length: 10 }, (_, i) => {
-                    const year = (new Date().getFullYear() + i).toString();
-                    return <SelectItem key={year} value={year}>{year}</SelectItem>;
-                  })}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={control}
-          name="billingInformation.cvv"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>
-                CVV <sub className="text-xs text-gray-500">[Airtable: CVV]</sub>
-              </FormLabel>
-              <FormControl>
-                <Input {...field} placeholder="XXX" maxLength={4} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      </div>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <FormField
+            control={control}
+            name="billingInformation.accountNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Account Number <sub className="text-xs text-gray-500">[Airtable: Account Number]</sub>
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="XXXXXXXX" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </>
+      ) : (
+        <>
+          <FormField
+            control={control}
+            name="billingInformation.cardType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Card Type <sub className="text-xs text-gray-500">[Airtable: Card Type]</sub>
+                </FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select card type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="visa">Visa</SelectItem>
+                    <SelectItem value="mastercard">Mastercard</SelectItem>
+                    <SelectItem value="amex">American Express</SelectItem>
+                    <SelectItem value="discover">Discover</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={control}
+            name="billingInformation.cardNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Card Number <sub className="text-xs text-gray-500">[Airtable: Card Number]</sub>
+                </FormLabel>
+                <FormControl>
+                  <Input {...field} placeholder="XXXX-XXXX-XXXX-XXXX" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          
+          <div className="grid grid-cols-3 gap-4">
+            <FormField
+              control={control}
+              name="billingInformation.expMonth"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Exp. Month <sub className="text-xs text-gray-500">[Airtable: Exp. Month]</sub>
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="MM" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => {
+                        const month = (i + 1).toString().padStart(2, '0');
+                        return <SelectItem key={month} value={month}>{month}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={control}
+              name="billingInformation.expYear"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Exp. Year <sub className="text-xs text-gray-500">[Airtable: Exp. Year]</sub>
+                  </FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="YYYY" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Array.from({ length: 10 }, (_, i) => {
+                        const year = (new Date().getFullYear() + i).toString();
+                        return <SelectItem key={year} value={year}>{year}</SelectItem>;
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
+            <FormField
+              control={control}
+              name="billingInformation.cvv"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    CVV <sub className="text-xs text-gray-500">[Airtable: CVV]</sub>
+                  </FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="XXX" maxLength={4} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }

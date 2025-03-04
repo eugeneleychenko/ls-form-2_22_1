@@ -164,7 +164,7 @@ const validateSubmissionData = (data: any) => {
   
   // Ensure boolean fields are actual booleans
   const booleanFields = [
-    'Currently Insured', 'Billing Info same as Applicant', 'Smoker?'
+    'Currently Insured', 'Billing Info same as Applicant', 'Smoker?', 'Bank ACH?'
   ];
   
   booleanFields.forEach(field => {
@@ -271,11 +271,20 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.billingInformation?.billingCity && { 'Billing City': formData.billingInformation.billingCity }),
       ...(formData.billingInformation?.billingState && { 'Billing State': formData.billingInformation.billingState }),
       ...(formData.billingInformation?.billingZipCode && { 'Billing Zip': formData.billingInformation.billingZipCode }),
-      ...(formData.billingInformation?.cardType && { 'Card Type': formData.billingInformation.cardType }),
-      ...(formData.billingInformation?.cardNumber && { 'Card Number': formData.billingInformation.cardNumber }),
-      ...(formData.billingInformation?.expMonth && { 'Exp. Month': formData.billingInformation.expMonth }),
-      ...(formData.billingInformation?.expYear && { 'Exp. Year': formData.billingInformation.expYear }),
-      ...(formData.billingInformation?.cvv && { 'CVV': ensureNumber(formData.billingInformation.cvv) }),
+      
+      // Credit Card Information - only include if not using Bank ACH
+      ...(!formData.billingInformation?.bankAch && formData.billingInformation?.cardType && { 'Card Type': formData.billingInformation.cardType }),
+      ...(!formData.billingInformation?.bankAch && formData.billingInformation?.cardNumber && { 'Card Number': formData.billingInformation.cardNumber }),
+      ...(!formData.billingInformation?.bankAch && formData.billingInformation?.expMonth && { 'Exp. Month': formData.billingInformation.expMonth }),
+      ...(!formData.billingInformation?.bankAch && formData.billingInformation?.expYear && { 'Exp. Year': formData.billingInformation.expYear }),
+      ...(!formData.billingInformation?.bankAch && formData.billingInformation?.cvv && { 'CVV': ensureNumber(formData.billingInformation.cvv) }),
+      
+      // Bank Transfer (ACH) Information
+      ...('bankAch' in (formData.billingInformation || {}) ? { 'Bank ACH?': ensureBoolean(formData.billingInformation?.bankAch) } : {}),
+      ...(formData.billingInformation?.bankName && { 'Bank Name': formData.billingInformation.bankName }),
+      ...(formData.billingInformation?.accountType && { 'Account Type': formData.billingInformation.accountType }),
+      ...(formData.billingInformation?.routingNumber && { 'Routing Number': formData.billingInformation.routingNumber }),
+      ...(formData.billingInformation?.accountNumber && { 'Account Number': formData.billingInformation.accountNumber }),
       
       // Agent Information
       ...(formData.agentInformation?.agentName && { 'Agent': formData.agentInformation.agentName }),

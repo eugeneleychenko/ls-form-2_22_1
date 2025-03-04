@@ -857,9 +857,28 @@ export default function InsuranceDetails() {
           const costMatch = addon.planCost.match(/\$?(\d+\.\d+)/);
           const cleanCost = costMatch ? `$${costMatch[1]}` : addon.planCost;
           
+          // Extract the numeric premium value for calculation
+          const premiumValue = parseFloat(addon.planCost.replace(/[^0-9.]/g, ''));
+          
+          // Process the commission correctly
+          const commissionValue = parseFloat(addon.planCommission);
+          let calculatedCommission = 0;
+          
+          if (commissionValue <= 1) {
+            // If it's a decimal percentage (e.g., 0.2 for 20%)
+            calculatedCommission = premiumValue * commissionValue;
+          } else {
+            // If it's already a percentage (e.g., 20 for 20%)
+            calculatedCommission = premiumValue * (commissionValue / 100);
+          }
+          
+          const formattedCommission = `$${calculatedCommission.toFixed(2)}`;
+          
           setValue("insuranceDetails.amt1Plan", addonName);
           setValue("insuranceDetails.amt1Premium", cleanCost);
-          setValue("insuranceDetails.amt1Commission", addon.planCommission);
+          setValue("insuranceDetails.amt1Commission", formattedCommission);
+          
+          console.log(`AMT 1 Commission calculated: Premium $${premiumValue} * Rate ${commissionValue <= 1 ? commissionValue * 100 : commissionValue}% = $${calculatedCommission.toFixed(2)}`);
         }
       } else {
         // Clear AMT 1 values when deselected
@@ -875,15 +894,61 @@ export default function InsuranceDetails() {
           const costMatch = addon.planCost.match(/\$?(\d+\.\d+)/);
           const cleanCost = costMatch ? `$${costMatch[1]}` : addon.planCost;
           
+          // Extract the numeric premium value for calculation
+          const premiumValue = parseFloat(addon.planCost.replace(/[^0-9.]/g, ''));
+          
+          // Process the commission correctly
+          const commissionValue = parseFloat(addon.planCommission);
+          let calculatedCommission = 0;
+          
+          if (commissionValue <= 1) {
+            // If it's a decimal percentage (e.g., 0.2 for 20%)
+            calculatedCommission = premiumValue * commissionValue;
+          } else {
+            // If it's already a percentage (e.g., 20 for 20%)
+            calculatedCommission = premiumValue * (commissionValue / 100);
+          }
+          
+          const formattedCommission = `$${calculatedCommission.toFixed(2)}`;
+          
           setValue("insuranceDetails.amt2Plan", addonName);
           setValue("insuranceDetails.amt2Premium", cleanCost);
-          setValue("insuranceDetails.amt2Commission", addon.planCommission);
+          setValue("insuranceDetails.amt2Commission", formattedCommission);
+          
+          console.log(`AMT 2 Commission calculated: Premium $${premiumValue} * Rate ${commissionValue <= 1 ? commissionValue * 100 : commissionValue}% = $${calculatedCommission.toFixed(2)}`);
         }
       } else {
         // Clear AMT 2 values when deselected
         setValue("insuranceDetails.amt2Plan", "");
         setValue("insuranceDetails.amt2Premium", "");
         setValue("insuranceDetails.amt2Commission", "");
+      }
+    } else if (provider === "American Financial 1") {
+      if (!isCurrentlySelected) {
+        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
+        if (addon) {
+          setValue("insuranceDetails.americanFinancial1Plan", addonName);
+        }
+      } else {
+        setValue("insuranceDetails.americanFinancial1Plan", "");
+      }
+    } else if (provider === "American Financial 2") {
+      if (!isCurrentlySelected) {
+        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
+        if (addon) {
+          setValue("insuranceDetails.americanFinancial2Plan", addonName);
+        }
+      } else {
+        setValue("insuranceDetails.americanFinancial2Plan", "");
+      }
+    } else if (provider === "American Financial 3") {
+      if (!isCurrentlySelected) {
+        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
+        if (addon) {
+          setValue("insuranceDetails.americanFinancial3Plan", addonName);
+        }
+      } else {
+        setValue("insuranceDetails.americanFinancial3Plan", "");
       }
     }
     
