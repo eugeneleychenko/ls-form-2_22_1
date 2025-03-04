@@ -80,6 +80,8 @@ const stringFields = [
   'American Financial 2 Premium', 'American Financial 2 Commission',
   'American Financial 3 Premium', 'American Financial 3 Commission',
   'Essential Care Premium', 'Essential Care Commission',
+  'AMT 1 Commission', 'AMT 2 Commission',
+  'Leo Addons Commissions',
   'Total Premium', 'Enrollment Fee Commission', 'Total Commission'
 ];
 
@@ -225,6 +227,18 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.insuranceDetails?.americanFinancial3Premium && { 'American Financial 3 Premium': ensureCurrencyString(formData.insuranceDetails.americanFinancial3Premium) }),
       ...(formData.insuranceDetails?.americanFinancial3Commission && { 'American Financial 3 Commission': ensureCurrencyString(formData.insuranceDetails.americanFinancial3Commission) }),
       ...(formData.insuranceDetails?.americanFinancial3Plan && { 'American Financial Plan 3': formData.insuranceDetails.americanFinancial3Plan }),
+      
+      // Add AMT Addons mappings - only use fields that exist in Airtable schema
+      ...(formData.insuranceDetails?.amt1Plan && { 'AMT 1': formData.insuranceDetails.amt1Plan }),
+      ...(formData.insuranceDetails?.amt1Commission && { 'AMT 1 Commission': ensureCurrencyString(formData.insuranceDetails.amt1Commission) }),
+      
+      ...(formData.insuranceDetails?.amt2Plan && { 'AMT 2': formData.insuranceDetails.amt2Plan }),
+      ...(formData.insuranceDetails?.amt2Commission && { 'AMT 2 Commission': ensureCurrencyString(formData.insuranceDetails.amt2Commission) }),
+      
+      // Add Leo Addons mapping - only use fields that exist in Airtable schema
+      ...(formData.insuranceDetails?.leoAddonsPlans && { 'Leo Addons': formData.insuranceDetails.leoAddonsPlans }),
+      ...(formData.insuranceDetails?.leoAddonsCommission && { 'Leo Addons Commissions': ensureCurrencyString(formData.insuranceDetails.leoAddonsCommission) }),
+      
       ...(formData.insuranceDetails?.essentialCarePremium && { 'Essential Care Premium': ensureCurrencyString(formData.insuranceDetails.essentialCarePremium) }),
       ...(formData.insuranceDetails?.essentialCareCommission && { 'Essential Care Commission': ensureCurrencyString(formData.insuranceDetails.essentialCareCommission) }),
       ...(formData.insuranceDetails?.totalPremium && { 'Total Premium': ensureCurrencyString(formData.insuranceDetails.totalPremium) }),

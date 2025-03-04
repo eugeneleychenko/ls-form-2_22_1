@@ -449,7 +449,9 @@ export default function InsuranceDetails() {
           if (!carrier || 
               carrier.toLowerCase().includes('american financial') || 
               carrier.toLowerCase().includes('essential care individual') || 
-              carrier.toLowerCase().includes('amt addons')) {
+              carrier.toLowerCase().includes('amt addons') ||
+              carrier.toLowerCase().includes('leo addons') ||  // Add Leo Addons to the exclusion list
+              carrier.toLowerCase().includes('addons')) {      // Exclude any carriers with "addons" in the name
             return;
           }
           
@@ -498,12 +500,18 @@ export default function InsuranceDetails() {
         // Store enrollment fee options for easy access
         console.log("Enrollment fees by carrier:", allEnrollmentFeesByCarrier);
         
-        // Mark types that have American Financial addons
+        // Mark types that have any addons (American Financial, Essential Care, AMT, Leo, etc.)
         data.records.forEach(record => {
           const type = record.fields.Type;
           const carrier = record.fields.Carriers;
           
-          if (carrier && carrier.includes('American Financial') && dataByType[type]) {
+          if (carrier && dataByType[type] && (
+              carrier.includes('American Financial') || 
+              carrier.includes('Essential Care Individual') || 
+              carrier.includes('AMT Addons') ||
+              carrier.includes('Leo Addons') ||
+              carrier.toLowerCase().includes('addons')
+          )) {
             dataByType[type].hasAddons = true;
           }
         });
@@ -810,28 +818,22 @@ export default function InsuranceDetails() {
     // Create a unique identifier that includes both the name and provider
     const addonIdentifier = `${provider}:${addonName}`;
     
-    if (selectedAddons.includes(addonIdentifier)) {
-      setSelectedAddons(selectedAddons.filter(addon => addon !== addonIdentifier));
-    } else {
-      setSelectedAddons([...selectedAddons, addonIdentifier]);
-    }
+    // Check if this addon is already selected
+    const isCurrentlySelected = selectedAddons.includes(addonIdentifier);
     
-    // Update the rest of the logic to use this new identifier format
-    // ... existing code ...
-  };
-
-  // Handle addon selection for multiselect (Leo Addons)
-  const handleMultiAddonSelection = (addonName: string, checked: boolean) => {
-    let updatedAddons = [...selectedAddons];
+    // Update selected addons list
+    let updatedAddons: string[];
     
-    if (checked) {
-      // Add the addon if it's not already selected
-      if (!updatedAddons.includes(addonName)) {
-        updatedAddons.push(addonName);
-      }
+    if (isCurrentlySelected) {
+      // Remove the addon if it's already selected
+      updatedAddons = selectedAddons.filter(addon => addon !== addonIdentifier);
     } else {
-      // Remove the addon if it's selected
-      updatedAddons = updatedAddons.filter(name => name !== addonName);
+      // Add the addon if it's not selected, and remove any other addon from the same provider
+      // (since radio buttons are mutually exclusive within a provider)
+      updatedAddons = [
+        ...selectedAddons.filter(addon => !addon.startsWith(`${provider}:`)),
+        addonIdentifier
+      ];
     }
     
     setSelectedAddons(updatedAddons);
@@ -845,6 +847,128 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.addonsCost", totalCost);
     setValue("insuranceDetails.addonsCommission", totalCommission);
     
+    // Map specific addon providers to their respective fields
+    if (provider === "AMT Addons 1") {
+      if (!isCurrentlySelected) {
+        // Find the addon in availableAddons
+        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
+        if (addon) {
+          // Extract just the numeric part of the cost (remove state availability info)
+          const costMatch = addon.planCost.match(/\$?(\d+\.\d+)/);
+          const cleanCost = costMatch ? `$${costMatch[1]}` : addon.planCost;
+          
+          setValue("insuranceDetails.amt1Plan", addonName);
+          setValue("insuranceDetails.amt1Premium", cleanCost);
+          setValue("insuranceDetails.amt1Commission", addon.planCommission);
+        }
+      } else {
+        // Clear AMT 1 values when deselected
+        setValue("insuranceDetails.amt1Plan", "");
+        setValue("insuranceDetails.amt1Premium", "");
+        setValue("insuranceDetails.amt1Commission", "");
+      }
+    } else if (provider === "AMT Addons 2") {
+      if (!isCurrentlySelected) {
+        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
+        if (addon) {
+          // Extract just the numeric part of the cost (remove state availability info)
+          const costMatch = addon.planCost.match(/\$?(\d+\.\d+)/);
+          const cleanCost = costMatch ? `$${costMatch[1]}` : addon.planCost;
+          
+          setValue("insuranceDetails.amt2Plan", addonName);
+          setValue("insuranceDetails.amt2Premium", cleanCost);
+          setValue("insuranceDetails.amt2Commission", addon.planCommission);
+        }
+      } else {
+        // Clear AMT 2 values when deselected
+        setValue("insuranceDetails.amt2Plan", "");
+        setValue("insuranceDetails.amt2Premium", "");
+        setValue("insuranceDetails.amt2Commission", "");
+      }
+    }
+    
+    // Calculate overall total commission
+    calculateTotalCommission(planCommission, updatedAddons);
+  };
+
+  // Handle addon selection for multiselect (Leo Addons)
+  const handleMultiAddonSelection = (addonName: string, checked: boolean) => {
+    // Create a unique identifier that includes both the name and provider
+    const provider = "Leo Addons";
+    const addonIdentifier = `${provider}:${addonName}`;
+    
+    let updatedAddons = [...selectedAddons];
+    
+    if (checked) {
+      // Add the addon if it's not already selected
+      if (!updatedAddons.includes(addonIdentifier)) {
+        updatedAddons.push(addonIdentifier);
+      }
+    } else {
+      // Remove the addon if it's selected
+      updatedAddons = updatedAddons.filter(addon => addon !== addonIdentifier);
+    }
+    
+    setSelectedAddons(updatedAddons);
+    setValue("insuranceDetails.selectedAddons", updatedAddons);
+    
+    // Calculate total cost and commission
+    const { totalCost, totalCommission } = calculateAddonsValues(updatedAddons);
+    setAddonsTotalCost(totalCost);
+    setAddonsTotalCommission(totalCommission);
+    
+    setValue("insuranceDetails.addonsCost", totalCost);
+    setValue("insuranceDetails.addonsCommission", totalCommission);
+    
+    // Handle Leo Addons specifically
+    const leoAddons = updatedAddons.filter(addon => 
+      addon.startsWith("Leo Addons:")
+    );
+    
+    if (leoAddons.length > 0) {
+      // Collect Leo addon names, premiums, and commissions
+      let leoPlans = "";
+      let totalLeoPremium = 0;
+      let totalLeoCommission = 0;
+      
+      leoAddons.forEach(addonIdentifier => {
+        const addonName = addonIdentifier.split(":")[1];
+        const addon = availableAddons.find(a => a.planName === addonName && a.provider === "Leo Addons");
+        
+        if (addon) {
+          // Add to list of Leo plans
+          leoPlans += (leoPlans ? ", " : "") + addonName;
+          
+          // Add premium
+          const premiumValue = parseFloat(addon.planCost.replace(/[^0-9.]/g, ''));
+          if (!isNaN(premiumValue)) {
+            totalLeoPremium += premiumValue;
+          }
+          
+          // Add commission
+          const commissionValue = parseFloat(addon.planCommission.replace(/[^0-9.]/g, ''));
+          if (!isNaN(commissionValue)) {
+            // If commission is a percentage, calculate the actual value
+            if (commissionValue <= 1) {
+              totalLeoCommission += premiumValue * commissionValue;
+            } else {
+              totalLeoCommission += premiumValue * (commissionValue / 100);
+            }
+          }
+        }
+      });
+      
+      // Set Leo Addons values
+      setValue("insuranceDetails.leoAddonsPlans", leoPlans);
+      setValue("insuranceDetails.leoAddonsPremium", `$${totalLeoPremium.toFixed(2)}`);
+      setValue("insuranceDetails.leoAddonsCommission", `$${totalLeoCommission.toFixed(2)}`);
+    } else {
+      // Clear Leo Addons values if none selected
+      setValue("insuranceDetails.leoAddonsPlans", "");
+      setValue("insuranceDetails.leoAddonsPremium", "");
+      setValue("insuranceDetails.leoAddonsCommission", "");
+    }
+    
     // Calculate overall total commission
     calculateTotalCommission(planCommission, updatedAddons);
   };
@@ -854,12 +978,26 @@ export default function InsuranceDetails() {
     let totalCost = 0;
     let totalCommission = 0; // [X] Added commission total
     
-    availableAddons.forEach(addon => {
-      // Check if the addon is selected using either the plain name or provider:name format
-      const isSelected = selectedAddons.includes(addon.planName) || 
-                         selectedAddons.includes(`${addon.provider}:${addon.planName}`);
+    selectedAddons.forEach(selectedAddon => {
+      // Parse the addon identifier (provider:name or just name)
+      let addonName: string;
+      let addonProvider: string | undefined;
       
-      if (isSelected) {
+      if (selectedAddon.includes(':')) {
+        const [provider, name] = selectedAddon.split(':');
+        addonProvider = provider;
+        addonName = name;
+      } else {
+        addonName = selectedAddon;
+      }
+      
+      // Find the addon in availableAddons
+      const addon = availableAddons.find(a => 
+        a.planName === addonName && 
+        (!addonProvider || a.provider === addonProvider)
+      );
+      
+      if (addon) {
         // Extract the cost value (remove $ and convert to number)
         const costString = typeof addon.planCost === 'string' ? 
           addon.planCost.replace(/[^0-9.]/g, '') : 
@@ -946,10 +1084,8 @@ export default function InsuranceDetails() {
   
   // Check if an addon is selected
   const isAddonSelected = (addonName: string, provider?: string): boolean => {
-    if (provider) {
-      return selectedAddons.includes(`${provider}:${addonName}`) || selectedAddons.includes(addonName);
-    }
-    return selectedAddons.includes(addonName) || selectedAddons.some(addon => addon.endsWith(`:${addonName}`));
+    const addonIdentifier = provider ? `${provider}:${addonName}` : addonName;
+    return selectedAddons.includes(addonIdentifier);
   };
   
   // Helper function to group addons by type
@@ -1568,7 +1704,7 @@ export default function InsuranceDetails() {
                             <div key={`${addon.provider}-${addon.planName}-${index}`} className="flex items-start space-x-2 border-b pb-2">
                               <Checkbox 
                                 id={`addon-${addon.provider}-${index}`} 
-                                checked={isAddonSelected(addon.planName)}
+                                checked={isAddonSelected(addon.planName, "Leo Addons")}
                                 onCheckedChange={(checked) => handleMultiAddonSelection(addon.planName, checked === true)}
                               />
                               <div className="space-y-1">

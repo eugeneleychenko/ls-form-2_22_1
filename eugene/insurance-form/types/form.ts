@@ -36,6 +36,15 @@ export interface FormData {
     americanFinancial3Premium?: string;
     americanFinancial3Commission?: string;
     americanFinancial3Plan?: string;
+    amt1Plan?: string;
+    amt1Premium?: string;
+    amt1Commission?: string;
+    amt2Plan?: string;
+    amt2Premium?: string;
+    amt2Commission?: string;
+    leoAddonsPlans?: string;
+    leoAddonsPremium?: string;
+    leoAddonsCommission?: string;
     essentialCarePremium?: string;
     essentialCareCommission?: string;
     totalPremium?: string;
