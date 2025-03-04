@@ -100,7 +100,7 @@ const validateSubmissionData = (data: any) => {
   
   // Specific checks for known fields that have type requirements
   const numberFields = [
-    'Zip', 'Billing Zip', 'CVV'
+    'CVV'
   ];
   
   // Convert number fields to ensure they're numbers
@@ -262,7 +262,7 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.addressInformation?.addressLine2 && { 'Address Line 2': formData.addressInformation.addressLine2 }),
       ...(formData.addressInformation?.city && { 'City': formData.addressInformation.city }),
       ...(formData.addressInformation?.state && { 'State': formData.addressInformation.state }),
-      ...(formData.addressInformation?.zipCode && { 'Zip': ensureNumber(formData.addressInformation.zipCode) }),
+      ...(formData.addressInformation?.zipCode && { 'Zip': formData.addressInformation.zipCode }),
       
       // Billing Information
       ...('sameAsApplicant' in (formData.billingInformation || {}) ? { 'Billing Info same as Applicant': ensureBoolean(formData.billingInformation?.sameAsApplicant) } : {}),
@@ -270,7 +270,7 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.billingInformation?.billingAddressLine2 && { 'Billing Address Line 2': formData.billingInformation.billingAddressLine2 }),
       ...(formData.billingInformation?.billingCity && { 'Billing City': formData.billingInformation.billingCity }),
       ...(formData.billingInformation?.billingState && { 'Billing State': formData.billingInformation.billingState }),
-      ...(formData.billingInformation?.billingZipCode && { 'Billing Zip': ensureNumber(formData.billingInformation.billingZipCode) }),
+      ...(formData.billingInformation?.billingZipCode && { 'Billing Zip': formData.billingInformation.billingZipCode }),
       ...(formData.billingInformation?.cardType && { 'Card Type': formData.billingInformation.cardType }),
       ...(formData.billingInformation?.cardNumber && { 'Card Number': formData.billingInformation.cardNumber }),
       ...(formData.billingInformation?.expMonth && { 'Exp. Month': formData.billingInformation.expMonth }),
