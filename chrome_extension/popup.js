@@ -1,13 +1,17 @@
 document.getElementById('prefillButton').addEventListener('click', async () => {
   try {
+    // Get the selected data source
+    const dataSource = document.querySelector('input[name="dataSource"]:checked').value;
+    console.log(`Using ${dataSource} data for form filling`);
+    
     // Get the current active tab
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
-    // First try sending a message to the content script
-    chrome.tabs.sendMessage(tab.id, { action: 'fillForm' }, (response) => {
+    // First try sending a message to the content script with the data source preference
+    chrome.tabs.sendMessage(tab.id, { action: 'fillForm', dataSource: dataSource }, (response) => {
       // If we get a response, great!
       if (response && response.status === 'success') {
-        console.log('Form filled successfully via content script!');
+        console.log(`Form filled successfully with ${dataSource} data via content script!`);
       } 
       // If there's an error (like content script not being loaded), fallback to executeScript
       else if (chrome.runtime.lastError) {
@@ -16,9 +20,10 @@ document.getElementById('prefillButton').addEventListener('click', async () => {
         // Execute script directly in the page context
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          function: fillForm
+          function: fillForm,
+          args: [dataSource]
         }).then(() => {
-          console.log('Form filled successfully via executeScript!');
+          console.log(`Form filled successfully with ${dataSource} data via executeScript!`);
         }).catch(err => {
           console.error('Failed to fill form:', err);
         });
@@ -30,78 +35,301 @@ document.getElementById('prefillButton').addEventListener('click', async () => {
 });
 
 // This function will be injected into the page if needed
-function fillForm() {
+function fillForm(dataSource = 'test') {
   // Function to fill the form with test data
-  const testData = {
-    // Member info
-    firstname: "John",
-    middlename: "A",
-    lastname: "Doe",
+  // Define the submission data here since it can't be passed from the popup
+  function loadPreviousSubmission() {
+    return {
+      "id": "rec4rdOhvOGKETOAB",
+      "createdTime": "2025-03-02T15:42:05.000Z",
+      "fields": {
+        "Carrier U65": "Advanced Wellness Plus",
+        "American Financial 3 Premium": "125",
+        "Exp. Month": "12",
+        "Dependent 6 SSN": "111-22-3333",
+        "Dependent Name": "Test Child 1",
+        "Dependent 4 DOB": "2014-09-23",
+        "Work Phone": "(555) 987-6543",
+        "Dependent 5 Name": "Test Child 4",
+        "Smoker?": "No",
+        "Fronter Name": "Jane Fronter",
+        "Dependent 6 Relationship": "parent",
+        "Last Time Insured": "2023-01-01",
+        "Projected Annual Income": 60000,
+        "Card Number": "4111111111111111",
+        "Weight": "180",
+        "American Financial 2 Commission": "20",
+        "American Financial Plan 1": "AF AD&D 50K $79.00",
+        "Dependent 3 Gender": "male",
+        "City": "Testville",
+        "Gender": "male",
+        "Enrollment Fee Commission": "20",
+        "Dependent 6 DOB": "1965-02-28",
+        "Billing Zip": "54321",
+        "Insurance State": "CA",
+        "Dependent Gender": "female",
+        "ACA Plan Premium": 450,
+        "Current Medications": "Aspirin, Vitamin D, Lisinopril",
+        "Dependent 4 Relationship": "child",
+        "Dependent 2 Relationship": "spouse",
+        "Total Premium": "1150",
+        "Carrier U65 Premium": "412.12",
+        "Essential Care Premium": "100",
+        "Lead Source": "website",
+        "Zip": "12345",
+        "Card Type": "visa",
+        "Dependent 3 Relationship": "child",
+        "Billing Address Line 2": "Suite 100",
+        "Dependent 5 SSN": "222-33-4444",
+        "Cell Phone": "(555) 123-4567",
+        "State": "CA",
+        "Dependent 4 Gender": "female",
+        "Major Hospitalizations/Surgeries": "Appendectomy 2018, Knee surgery 2020",
+        "Billing State": "NY",
+        "DOB": "1990-01-01",
+        "Dependent DOB": "2010-05-15",
+        "Address Line 1": "123 Test Street",
+        "Dependent 5 Relationship": "child",
+        "Total Commission": "123.64",
+        "CVV": 123,
+        "American Financial Plan 3": "AF Critical Illness 2,500 $64.00",
+        "American Financial 1 Premium": "50",
+        "Dependent 3 SSN": "444-55-6666",
+        "Essential Care Commission": "25",
+        "American Financial 1 Commission": "15",
+        "Dependent 3 Name": "Test Child 2",
+        "Carrier U65 Commission": "123.64",
+        "Lead ID": "1235",
+        "firstName": "Test",
+        "lastName": "User",
+        "Address Line 2": "Apt 4B",
+        "Notes": "Test submission with maximum data for comprehensive Airtable field testing",
+        "Dependent 2 SSN": "456-78-9123",
+        "American Financial 3 Commission": "30",
+        "Height": "72",
+        "Dependent 2 Gender": "female",
+        "Dependent 5 DOB": "2016-11-12",
+        "Carrier ACA": "Ambetter",
+        "Dependent 2 Name": "Test Spouse",
+        "Dependent 6 Gender": "male",
+        "email": "test@example.com",
+        "Billing Address Line 1": "456 Billing Street",
+        "Dependent SSN": "987-65-4321",
+        "Exp. Year": "2025",
+        "Pre Existing Conditions": "Hypertension, Asthma",
+        "Currently Insured": true,
+        "Dependent 6 Name": "Test Parent",
+        "Plan": "Advanced Wellness Plus 500 $412.12",
+        "American Financial 2 Premium": "75",
+        "Enrollment Fee": "27.5",
+        "Dependent Relationship": "child",
+        "Dependent 5 Gender": "male",
+        "Type": "Individual",
+        "SSN": "123-45-6789",
+        "American Financial Plan 2": "AF AME 500 $29.95",
+        "Billing City": "Billtown",
+        "Dependent 3 DOB": "2012-07-19",
+        "Dependent 4 Name": "Test Child 3",
+        "Dependent 4 SSN": "333-44-5555",
+        "Dependent 2 DOB": "1992-03-20",
+        "Agent": "Agent Smith"
+      }
+    };
+  }
+  
+  function mapSubmissionToFormData(submission) {
+    const fields = submission.fields;
     
-    // Address
-    address: "123 Main St",
-    address2: "Apt 4B",
-    city: "Little Rock",
-    state: "AR", // Arkansas is pre-selected in the form
-    zipcode: "72201",
+    // Helper function to split phone numbers
+    function splitPhone(phone) {
+      // Remove all non-numeric characters
+      const cleaned = phone.replace(/\D/g, '');
+      return {
+        first: cleaned.substring(0, 3),
+        second: cleaned.substring(3, 6),
+        third: cleaned.substring(6, 10)
+      };
+    }
     
-    // Contact
-    phone1_1: "555",
-    phone1_2: "123",
-    phone1_3: "4567",
-    phone2_1: "555",
-    phone2_2: "987",
-    phone2_3: "6543",
-    email: "test@example.com",
-    email_confirm: "test@example.com",
+    // Helper function to split date (YYYY-MM-DD format)
+    function splitDate(date) {
+      const parts = date.split('-');
+      return {
+        year: parts[0],
+        month: parseInt(parts[1], 10).toString(), // Remove leading zero
+        day: parseInt(parts[2], 10).toString()    // Remove leading zero
+      };
+    }
     
-    // Attributes
-    ssn: "123-45-6789",
-    dobmonth: "1", // January
-    dobday: "15",
-    dobyear: "1980",
-    gender: "M",
+    // Map the submission fields to form fields
+    const cellPhone = splitPhone(fields["Cell Phone"] || "");
+    const workPhone = splitPhone(fields["Work Phone"] || "");
+    const dob = splitDate(fields["DOB"] || "");
     
-    // Agent info
-    source_detail: "Test Agent",
+    // Log DOB information for debugging
+    console.log('DOB from submission:', fields["DOB"]);
+    console.log('Parsed DOB values:', dob);
     
-    // Notes
-    notes: "This is a test enrollment",
+    // Convert gender to single character format if needed
+    const genderMap = {
+      "male": "M",
+      "female": "F"
+    };
     
-    // Beneficiary info
-    ben_relationship: "Spouse",
-    ben_name: "Jane Doe",
-    ben_address: "123 Main St",
-    ben_city: "Little Rock",
-    ben_state: "AR",
-    ben_zipcode: "72201",
-    ben_phone1_1: "555",
-    ben_phone1_2: "123",
-    ben_phone1_3: "4567",
-    ben_DOBMonth: "2", // February
-    ben_DOBDay: "20",
-    ben_DOBYear: "1982",
+    const gender = genderMap[fields["Gender"].toLowerCase()] || fields["Gender"];
     
-    // Payment info - Credit Card
-    cc_number: "4111111111111111", // Test Visa number
-    pay_ccexpmonth: "01",
-    pay_ccexpyear: "2030",
-    pay_cccvv2: "123",
-    pay_fname: "John",
-    pay_lname: "Doe",
-    pay_address: "123 Main St",
-    pay_city: "Little Rock",
-    pay_state: "AR",
-    pay_zipcode: "72201",
-    
-    // Dates
-    pd_20277168_dtBilling: "03/06/2025",
-    pd_20277168_dtEffective: "03/07/2025",
-    
-    // Other
-    send_text: "5551234567",
-    send_email: "test@example.com"
-  };
+    // Create the data object with mapped fields
+    return {
+      // Member info
+      firstname: fields["firstName"] || "",
+      middlename: "", // Not in submission data
+      lastname: fields["lastName"] || "",
+      
+      // Address
+      address: fields["Address Line 1"] || "",
+      address2: fields["Address Line 2"] || "",
+      city: fields["City"] || "",
+      state: fields["State"] || "",
+      zipcode: fields["Zip"] ? fields["Zip"].replace(/,/g, '') : "",
+      
+      // Contact
+      phone1_1: cellPhone.first,
+      phone1_2: cellPhone.second,
+      phone1_3: cellPhone.third,
+      phone2_1: workPhone.first,
+      phone2_2: workPhone.second,
+      phone2_3: workPhone.third,
+      email: fields["email"] || "",
+      email_confirm: fields["email"] || "",
+      
+      // Attributes
+      ssn: fields["SSN"] || "",
+      dobmonth: dob.month,
+      dobday: dob.day,
+      dobyear: dob.year,
+      gender: gender,
+      
+      // Agent info
+      source_detail: fields["Agent"] || "",
+      
+      // Notes
+      notes: fields["Notes"] || "",
+      
+      // Beneficiary info - using Dependent 2 (spouse) data
+      ben_relationship: fields["Dependent 2 Relationship"] || "",
+      ben_name: fields["Dependent 2 Name"] || "",
+      ben_address: fields["Address Line 1"] || "", // Assuming same address
+      ben_city: fields["City"] || "",
+      ben_state: fields["State"] || "",
+      ben_zipcode: fields["Zip"] ? fields["Zip"].replace(/,/g, '') : "",
+      ben_phone1_1: cellPhone.first,
+      ben_phone1_2: cellPhone.second,
+      ben_phone1_3: cellPhone.third,
+      ben_DOBMonth: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).month : "",
+      ben_DOBDay: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).day : "",
+      ben_DOBYear: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).year : "",
+      
+      // Payment info - Credit Card
+      cc_number: fields["Card Number"] || "",
+      pay_ccexpmonth: fields["Exp. Month"] || "",
+      pay_ccexpyear: fields["Exp. Year"] || "",
+      pay_cccvv2: fields["CVV"] ? fields["CVV"].toString() : "",
+      pay_fname: fields["firstName"] || "",
+      pay_lname: fields["lastName"] || "",
+      pay_address: fields["Billing Address Line 1"] || "",
+      pay_city: fields["Billing City"] || "",
+      pay_state: fields["Billing State"] || "",
+      pay_zipcode: fields["Billing Zip"] ? fields["Billing Zip"].replace(/,/g, '') : "",
+      
+      // Other fields
+      pd_20277168_dtBilling: "03/06/2025",
+      pd_20277168_dtEffective: "03/07/2025",
+      send_text: cellPhone.first + cellPhone.second + cellPhone.third,
+      send_email: fields["email"] || ""
+    };
+  }
+  
+  console.log(`Filling form with ${dataSource} data via executeScript...`);
+  
+  let testData;
+  
+  if (dataSource === 'real') {
+    // Load and map real submission data
+    const submission = loadPreviousSubmission();
+    testData = mapSubmissionToFormData(submission);
+  } else {
+    // Use the original test data
+    testData = {
+      // Member info
+      firstname: "John",
+      middlename: "A",
+      lastname: "Doe",
+      
+      // Address
+      address: "123 Main St",
+      address2: "Apt 4B",
+      city: "Little Rock",
+      state: "AR", // Arkansas is pre-selected in the form
+      zipcode: "72201",
+      
+      // Contact
+      phone1_1: "555",
+      phone1_2: "123",
+      phone1_3: "4567",
+      phone2_1: "555",
+      phone2_2: "987",
+      phone2_3: "6543",
+      email: "test@example.com",
+      email_confirm: "test@example.com",
+      
+      // Attributes
+      ssn: "123-45-6789",
+      dobmonth: "1", // January
+      dobday: "15",
+      dobyear: "1980",
+      gender: "M",
+      
+      // Agent info
+      source_detail: "Test Agent",
+      
+      // Notes
+      notes: "This is a test enrollment",
+      
+      // Beneficiary info
+      ben_relationship: "Spouse",
+      ben_name: "Jane Doe",
+      ben_address: "123 Main St",
+      ben_city: "Little Rock",
+      ben_state: "AR",
+      ben_zipcode: "72201",
+      ben_phone1_1: "555",
+      ben_phone1_2: "123",
+      ben_phone1_3: "4567",
+      ben_DOBMonth: "2", // February
+      ben_DOBDay: "20",
+      ben_DOBYear: "1982",
+      
+      // Payment info - Credit Card
+      cc_number: "4111111111111111", // Test Visa number
+      pay_ccexpmonth: "01",
+      pay_ccexpyear: "2030",
+      pay_cccvv2: "123",
+      pay_fname: "John",
+      pay_lname: "Doe",
+      pay_address: "123 Main St",
+      pay_city: "Little Rock",
+      pay_state: "AR",
+      pay_zipcode: "72201",
+      
+      // Dates
+      pd_20277168_dtBilling: "03/06/2025",
+      pd_20277168_dtEffective: "03/07/2025",
+      
+      // Other
+      send_text: "5551234567",
+      send_email: "test@example.com"
+    };
+  }
   
   // First, fill all non-payment fields
   fillNonPaymentFields(testData);
@@ -109,6 +337,7 @@ function fillForm() {
   // Then, handle the payment fields with special care
   handlePaymentFields(testData);
   
+  console.log(`Form has been filled with ${dataSource} data!`);
   return true; // Indicate success
 }
 
@@ -147,10 +376,33 @@ function fillNonPaymentFields(testData) {
     if (elements.length > 0) {
       const element = elements[0];
       if (element.tagName === 'SELECT') {
+        // Log select element values for debugging
+        if (key.includes('dob')) {
+          console.log(`Setting select field ${key} to value: "${testData[key]}"`);
+        }
+        
         element.value = testData[key];
         // Trigger change event to activate any dependent fields
         const changeEvent = new Event('change', { bubbles: true });
         element.dispatchEvent(changeEvent);
+        
+        // Additional check for DOB fields
+        if (key.includes('dob')) {
+          console.log(`After setting, ${key} has value: "${element.value}"`);
+          
+          // If value wasn't set, try to set it using the option index
+          if (element.value !== testData[key] && testData[key]) {
+            // Find option with matching value
+            for (let i = 0; i < element.options.length; i++) {
+              if (element.options[i].value === testData[key]) {
+                element.selectedIndex = i;
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+                console.log(`Used selectedIndex to set ${key} to "${testData[key]}"`);
+                break;
+              }
+            }
+          }
+        }
       }
     }
   });

@@ -1,6 +1,6 @@
 # Form Prefiller Chrome Extension
 
-A simple Chrome extension to prefill enrollment forms with test data.
+A simple Chrome extension to prefill enrollment forms with test data or real submission data.
 
 ## Installation
 
@@ -14,59 +14,52 @@ A simple Chrome extension to prefill enrollment forms with test data.
 
 1. Navigate to the enrollment form page
 2. Click on the extension icon in your Chrome toolbar
-3. Click the "Fill Form with Test Data" button
-4. All form fields will be populated with test data
+3. Choose your data source:
+   - **Use Test Data**: Fills the form with predefined test values
+   - **Use Real Submission**: Fills the form with data from a previous submission
+4. Click the "Fill Form with Data" button
+5. All form fields will be populated with the selected data
 
-## Test Data
+## Data Sources
 
-The extension fills the form with the following test data:
+### Test Data
+The extension's built-in test data includes fictional information for all form fields.
 
-### Member Information
-- First Name: John
-- Middle Name: A
-- Last Name: Doe
+### Real Submission Data
+The extension can also use data from a previous form submission, mapped to the appropriate fields. This is useful for testing with real-world data.
 
-### Address
-- Address: 123 Main St
-- Address 2: Apt 4B
-- City: Little Rock
-- State: AR (Arkansas)
-- ZIP Code: 72201
+## Form Field Mapping
 
-### Contact Information
-- Phone: 555-123-4567
-- Alternate Phone: 555-987-6543
-- Email: test@example.com
+The extension maps fields from the previous submission data to the form fields as follows:
 
-### Attributes
-- SSN: 123-45-6789
-- Date of Birth: 01/15/1980
-- Gender: Male
-
-### Payment Information
-- Payment Type: Credit Card
-- Credit Card Number: 4111111111111111 (test Visa number)
-- Expiration Date: 01/2030
-- CVV: 123
-- Billing Name: John Doe
-- Billing Address: 123 Main St
-- City: Little Rock
-- State: AR
-- ZIP Code: 72201
-
-### Beneficiary Information
-- Relationship: Spouse
-- Name: Jane Doe
-- Address: 123 Main St
-- City: Little Rock
-- State: AR
-- ZIP Code: 72201
-- Phone: 555-123-4567
-- Date of Birth: 02/20/1982
+| Form Field | Previous Submission Field |
+|------------|---------------------------|
+| firstname | firstName |
+| lastname | lastName |
+| address | Address Line 1 |
+| address2 | Address Line 2 |
+| city | City |
+| state | State |
+| zipcode | Zip |
+| phone1_# | Cell Phone (split) |
+| phone2_# | Work Phone (split) |
+| email | email |
+| ssn | SSN |
+| dob fields | DOB (split) |
+| gender | Gender |
+| cc_number | Card Number |
+| pay_ccexpmonth | Exp. Month |
+| pay_ccexpyear | Exp. Year |
+| pay_cccvv2 | CVV |
+| pay_address | Billing Address Line 1 |
+| pay_city | Billing City |
+| pay_state | Billing State |
+| pay_zipcode | Billing Zip |
 
 ## Features
 
 - Automatically fills all form fields with realistic test data
+- Can use real submission data from previous enrollments
 - Properly selects Credit Card payment option
 - Handles AJAX validation to ensure credit card fields remain filled
 - Uses advanced techniques to prevent fields from being cleared

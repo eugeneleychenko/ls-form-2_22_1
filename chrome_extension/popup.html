@@ -4,7 +4,7 @@
   <title>Form Prefiller</title>
   <style>
     body {
-      width: 200px;
+      width: 220px;
       padding: 10px;
       font-family: Arial, sans-serif;
     }
@@ -17,15 +17,41 @@
       border-radius: 4px;
       cursor: pointer;
       font-weight: bold;
+      margin-top: 10px;
     }
     button:hover {
       background-color: #3367D6;
+    }
+    .data-select {
+      margin-bottom: 10px;
+    }
+    h3 {
+      margin-top: 0;
+      color: #333;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      cursor: pointer;
+    }
+    input[type="radio"] {
+      margin-right: 5px;
     }
   </style>
 </head>
 <body>
   <h3>Form Prefiller</h3>
-  <button id="prefillButton">Fill Form with Test Data</button>
+  
+  <div class="data-select">
+    <label>
+      <input type="radio" name="dataSource" value="test" checked> Use Test Data
+    </label>
+    <label>
+      <input type="radio" name="dataSource" value="real"> Use Real Submission
+    </label>
+  </div>
+  
+  <button id="prefillButton">Fill Form with Data</button>
   <script src="popup.js"></script>
 </body>
 </html> 
