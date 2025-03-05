@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Form Prefiller Test Page</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      color: #4285F4;
+    }
+    .instructions {
+      background-color: #f5f5f5;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .form-section {
+      margin-bottom: 30px;
+    }
+    fieldset {
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+    legend {
+      font-weight: bold;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    input, select, textarea {
+      margin-bottom: 10px;
+    }
+    .required {
+      color: #cc0000;
+    }
+  </style>
+</head>
+<body>
+  <h1>Form Prefiller Test Page</h1>
+  
+  <div class="instructions">
+    <p>This page contains a simplified version of the enrollment form structure. Use it to test the Form Prefiller Chrome extension.</p>
+    <p>To test:</p>
+    <ol>
+      <li>Load this page in Chrome</li>
+      <li>Click the Form Prefiller extension icon</li>
+      <li>Click "Fill Form with Test Data"</li>
+      <li>Observe the form fields being populated with test data</li>
+    </ol>
+  </div>
+  
+  <div id="page-body">
+    <div class="cart-form-floater">
+      <div class="left member-details-form">
+        <!-- Member Info Section -->
+        <fieldset id="member-name">
+          <legend>Member</legend>
+          <label>First Name</label>
+          <input name="firstname" value="" type="text" size="25" maxlength="29" class="name"> <font class="required">*</font><br>
+          
+          <label>Middle Initial</label>
+          <input name="middlename" value="" type="text" maxlength="2" size="5" class="zip"><br>
+          
+          <label>Last Name</label>
+          <input name="lastname" value="" type="text" size="25" maxlength="40" class="text"> <font class="required">*</font><br>
+        </fieldset>
+        
+        <!-- Address Section -->
+        <fieldset id="member-address">
+          <legend>Address</legend>
+          <label>Address</label>
+          <input name="address" size="25" maxlength="255" value="" class="text"> <font class="required">*</font><br>
+          
+          <label>Address 2</label>
+          <input name="address2" size="25" maxlength="255" value="" class="text"><br>
+          
+          <label>City</label>
+          <input name="city" size="25" maxlength="255" value="" class="text"> <font class="required">*</font><br>
+          
+          <label>State</label>
+          <select name="state" id="state">
+            <option value="">Select ...</option>
+            <option value="AL">Alabama</option>
+            <option value="AZ">Arizona</option>
+            <option value="AR" selected="selected">Arkansas</option>
+            <option value="FL">Florida</option>
+          </select> <font class="required">*</font><br>
+          
+          <label>Zip Code</label>
+          <input name="zipcode" size="10" maxlength="255" value="" class="zip"> <font class="required">*</font><br>
+        </fieldset>
+        
+        <!-- Contact Section -->
+        <fieldset id="member-contact">
+          <legend>Contact</legend>
+          <label>Phone Number</label>
+          <input type="text" name="phone1_1" value="" size="3" maxlength="3" class="phone"> -
+          <input type="text" name="phone1_2" value="" size="3" maxlength="3" class="phone"> -
+          <input type="text" name="phone1_3" value="" size="4" maxlength="4" class="phone"> <font class="required">*</font><br>
+          
+          <label>Alternate Phone</label>
+          <input type="text" name="phone2_1" value="" size="3" maxlength="3" class="phone"> -
+          <input type="text" name="phone2_2" value="" size="3" maxlength="3" class="phone"> -
+          <input type="text" name="phone2_3" value="" size="4" maxlength="4" class="phone"><br>
+          
+          <label>Email Address</label>
+          <input name="email" size="25" maxlength="255" value="" class="text"> <font class="required">*</font><br>
+          
+          <label>Confirm Email Address</label>
+          <input name="email_confirm" size="25" maxlength="255" value="" class="text"><br>
+        </fieldset>
+        
+        <!-- Attributes Section -->
+        <fieldset id="member-attributes">
+          <legend>Attributes</legend>
+          <label>Social Security #</label>
+          <input name="ssn" size="25" maxlength="11" value="" class="name"><br>
+          
+          <label>Date of Birth</label>
+          <select name="dobmonth">
+            <option value="">Month</option>
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <!-- More months... -->
+          </select>
+          
+          <select name="dobday">
+            <option value="">Day</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <!-- More days... -->
+          </select>
+          
+          <select name="dobyear">
+            <option value="">Year</option>
+            <option value="1980">1980</option>
+            <option value="1981">1981</option>
+            <!-- More years... -->
+          </select> <font class="required">*</font><br>
+          
+          <label>Gender</label>
+          <select name="gender">
+            <option value=""></option>
+            <option value="M">Male</option>
+            <option value="F">Female</option>
+          </select> <font class="required">*</font><br>
+        </fieldset>
+      </div>
+      
+      <!-- Payment Section -->
+      <fieldset id="payment-tabs">
+        <legend>Payment Method</legend>
+        <div id="paymenttype_div">
+          <span class="payment-option">
+            <input type="radio" name="paymentType" value="4854"> Credit Card
+          </span>
+        </div>
+        
+        <div id="payment_div">
+          <label>Credit Card Number</label>
+          <input class="text" name="cc_number" size="16" maxlength="16" value=""><br>
+          
+          <label>Card Expiration Date</label>
+          <select name="pay_ccexpmonth">
+            <option value="" selected="">Month</option>
+            <option value="01">01 - January</option>
+            <!-- More months... -->
+          </select>
+          
+          <select name="pay_ccexpyear">
+            <option value="" selected="">Year</option>
+            <option value="2025">2025</option>
+            <!-- More years... -->
+          </select><br>
+          
+          <label>Security Code/CVV2</label>
+          <input class="text" type="text" name="pay_cccvv2" value="" size="5" maxlength="4"><br>
+          
+          <label>First Name</label>
+          <input class="text" name="pay_fname" size="20" maxlength="255" value=""><br>
+          
+          <label>Last Name</label>
+          <input class="text" type="text" size="20" name="pay_lname" value=""><br>
+          
+          <label>Street Address</label>
+          <input class="text" type="text" size="20" name="pay_address" value=""><br>
+          
+          <label>City</label>
+          <input class="text" name="pay_city" size="15" maxlength="255" value=""><br>
+          
+          <label>State</label>
+          <select name="pay_state">
+            <option selected="" value="">Select ...</option>
+            <option value="AL">Alabama</option>
+            <!-- More states... -->
+          </select><br>
+          
+          <label>Zip Code</label>
+          <input class="text" name="pay_zipcode" size="15" maxlength="255" value=""><br>
+        </div>
+      </fieldset>
+      
+      <!-- Agreement Section -->
+      <fieldset id="auth-tabs">
+        <legend>Authorization</legend>
+        <div class="disclaimer">
+          <div id="acknowledge">
+            <input type="checkbox" name="chkAgree" value="1">
+            <strong>By checking the box, I acknowledge that I have verified the enrollment information.</strong>
+          </div>
+        </div>
+      </fieldset>
+    </div>
+  </div>
+</body>
+</html> 
