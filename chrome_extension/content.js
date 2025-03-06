@@ -13,21 +13,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
       // Fill form with the selected submission from search
       console.log("Using search submission:", request.submission);
       fillFormWithSubmission(request.submission);
-    }
-    else if (request.dataSource === 'real') {
-      // Fill form with real submission data
-      console.log("Using real data");
-      const submission = loadPreviousSubmission();
-      fillFormWithSubmission(submission);
-    }
-    else {
-      // Default: Fill form with test data
-      console.log("Using test data");
-      const submission = createTestSubmission();
-      fillFormWithSubmission(submission);
+      sendResponse({status: 'success'});
+    } else {
+      // Handle error when no submission is provided
+      console.error("No valid submission provided for form filling");
+      sendResponse({status: 'error', message: 'No valid submission provided'});
     }
     
-    sendResponse({status: 'success'});
     return true;
   }
   
@@ -610,30 +602,12 @@ function mapSubmissionToFormData(submission) {
   };
 }
 
-// Function to fill form with submission data
+// Function to fill form with a specific submission
 function fillFormWithSubmission(submission) {
-  console.log('Filling form with submission data:', submission);
+  console.log('Filling form with submission:', submission);
   
-  // Map submission data to form fields
-  const formData = mapSubmissionToFormData(submission);
-  
-  // First, fill all non-payment fields
-  fillNonPaymentFields(formData);
-  
-  // Then, handle the payment fields with special care
-  handlePaymentFields(formData);
-  
-  console.log('Form has been filled with submission data!');
-}
-
-// Function to fill form with real Airtable data
-function fillFormWithRealData() {
-  console.log('Filling form with real Airtable data');
-  
-  // Load previous submission data
-  const submission = loadPreviousSubmission();
-  if (!submission) {
-    console.error('No previous submission data available');
+  if (!submission || !submission.fields) {
+    console.error('Invalid submission data');
     return;
   }
   
@@ -644,93 +618,10 @@ function fillFormWithRealData() {
   fillNonPaymentFields(formData);
   handlePaymentFields(formData);
   
-  console.log('Form has been filled with real submission data!');
+  console.log('Form has been filled with submission data!');
 }
 
-// Existing test data function
-function fillFormWithTestData() {
-  console.log('Filling form with test data');
-  
-  // Use existing test data
-  const testData = {
-    // Member info
-    firstname: "John",
-    middlename: "A",
-    lastname: "Doe",
-    
-    // Address
-    address: "123 Main St",
-    address2: "Apt 4B",
-    city: "Little Rock",
-    state: "AR", // Arkansas is pre-selected in the form
-    zipcode: "72201",
-    
-    // Contact
-    phone1_1: "555",
-    phone1_2: "123",
-    phone1_3: "4567",
-    phone2_1: "555",
-    phone2_2: "987",
-    phone2_3: "6543",
-    email: "test@example.com",
-    email_confirm: "test@example.com",
-    
-    // Attributes
-    ssn: "123-45-6789",
-    dobmonth: "1", // January
-    dobday: "15",
-    dobyear: "1980",
-    gender: "M",
-    
-    // Agent info
-    source_detail: "Test Agent",
-    
-    // Notes
-    notes: "This is a test enrollment",
-    
-    // Beneficiary info
-    ben_relationship: "Spouse",
-    ben_name: "Jane Doe",
-    ben_address: "123 Main St",
-    ben_city: "Little Rock",
-    ben_state: "AR",
-    ben_zipcode: "72201",
-    ben_phone1_1: "555",
-    ben_phone1_2: "123",
-    ben_phone1_3: "4567",
-    ben_DOBMonth: "2", // February
-    ben_DOBDay: "20",
-    ben_DOBYear: "1982",
-    
-    // Payment info - Credit Card
-    cc_number: "4111111111111111", // Test Visa number
-    pay_ccexpmonth: "01",
-    pay_ccexpyear: "2030",
-    pay_cccvv2: "123",
-    pay_fname: "John",
-    pay_lname: "Doe",
-    pay_address: "123 Main St",
-    pay_city: "Little Rock",
-    pay_state: "AR",
-    pay_zipcode: "72201",
-    
-    // Dates
-    pd_20277168_dtBilling: "03/06/2025",
-    pd_20277168_dtEffective: "03/07/2025",
-    
-    // Other
-    send_text: "5551234567",
-    send_email: "test@example.com"
-  };
-  
-  // Fill form with test data
-  fillNonPaymentFields(testData);
-  handlePaymentFields(testData);
-  
-  console.log('Form has been filled with test data!');
-}
-
-// Function to fill all non-payment related fields
+// Fill non-payment fields with the provided data
 function fillNonPaymentFields(testData) {
   // Create a list of payment-related field prefixes to exclude
   const paymentPrefixes = ['cc_', 'pay_'];

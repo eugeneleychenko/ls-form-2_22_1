@@ -124,15 +124,7 @@
   
   <div class="data-source">
     <div class="radio-option">
-      <input type="radio" id="testData" name="dataSource" value="test" checked>
-      <label for="testData">Use Test Data</label>
-    </div>
-    <div class="radio-option">
-      <input type="radio" id="realData" name="dataSource" value="real">
-      <label for="realData">Use Real Submission</label>
-    </div>
-    <div class="radio-option">
-      <input type="radio" id="searchData" name="dataSource" value="search">
+      <input type="radio" id="searchData" name="dataSource" value="search" checked>
       <label for="searchData">Search by Name <span id="submissionCount" class="count-badge">0</span></label>
     </div>
   </div>
@@ -143,7 +135,7 @@
     <div id="selectedPerson"></div>
   </div>
   
-  <button id="prefillButton">Fill Form with Test Data</button>
+  <button id="prefillButton">Fill Form with Selected Person</button>
   <button id="refreshButton">Refresh Submissions</button>
   
   <div id="statusMessage" class="status-message"></div>
