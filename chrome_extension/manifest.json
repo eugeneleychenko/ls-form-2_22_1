@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Form Prefiller",
   "version": "1.0",
-  "description": "Prefills enrollment form with test data",
+  "description": "Chrome extension to prefill form fields with test data",
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -11,14 +11,22 @@
       "128": "images/icon128.png"
     }
   },
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["scripting", "activeTab", "storage"],
+  "host_permissions": [
+    "https://api.airtable.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["submission.js", "content.js"]
     }
-  ]
+  ],
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  }
 } 

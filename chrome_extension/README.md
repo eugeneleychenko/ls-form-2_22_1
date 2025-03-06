@@ -1,86 +1,91 @@
 # Form Prefiller Chrome Extension
 
-A simple Chrome extension to prefill enrollment forms with test data or real submission data.
+This Chrome extension helps streamline form filling by automatically populating enrollment form fields with test or real submission data.
 
 ## Installation
 
-1. Save all the files in a folder named `chrome_extension`
+1. Download or clone this repository
 2. Open Chrome and navigate to `chrome://extensions/`
-3. Enable "Developer mode" using the toggle in the top-right corner
+3. Enable "Developer mode" in the top right corner
 4. Click "Load unpacked" and select the `chrome_extension` folder
-5. The extension should now be installed and visible in your extensions list
+5. The extension should now appear in your Chrome toolbar
 
 ## Usage
 
 1. Navigate to the enrollment form page
-2. Click on the extension icon in your Chrome toolbar
-3. Choose your data source:
-   - **Use Test Data**: Fills the form with predefined test values
-   - **Use Real Submission**: Fills the form with data from a previous submission
-4. Click the "Fill Form with Data" button
-5. All form fields will be populated with the selected data
+2. Click on the Form Prefiller extension icon in your Chrome toolbar
+3. Select your desired data source:
+   - **Use Test Data**: Fills the form with pre-defined test data
+   - **Use Real Submission**: Fills the form with data from a recent submission
+   - **Search by Name**: Allows you to search for previous submissions by name
+4. If using "Search by Name":
+   - Type the first or last name in the search field
+   - Select a person from the results
+   - The selected person will be displayed
+5. Click "Fill Form with Test Data" button
+6. All form fields will be populated with the selected data
 
-## Data Sources
+## Test Data
 
-### Test Data
-The extension's built-in test data includes fictional information for all form fields.
+The extension provides the following test data for form filling:
 
-### Real Submission Data
-The extension can also use data from a previous form submission, mapped to the appropriate fields. This is useful for testing with real-world data.
+### Member Information
+- Name: John A Doe
+- Address: 123 Main St, Apt 4B, Little Rock, AR 72201
+- Phone: (555) 123-4567 / (555) 987-6543
+- Email: test@example.com
+- SSN: 123-45-6789
+- DOB: 01/15/1980
+- Gender: Male
 
-## Form Field Mapping
+### Beneficiary Information
+- Relationship: Spouse
+- Name: Jane Doe
+- Address: 123 Main St, Little Rock, AR 72201
+- Phone: (555) 123-4567
+- DOB: 02/20/1982
 
-The extension maps fields from the previous submission data to the form fields as follows:
-
-| Form Field | Previous Submission Field |
-|------------|---------------------------|
-| firstname | firstName |
-| lastname | lastName |
-| address | Address Line 1 |
-| address2 | Address Line 2 |
-| city | City |
-| state | State |
-| zipcode | Zip |
-| phone1_# | Cell Phone (split) |
-| phone2_# | Work Phone (split) |
-| email | email |
-| ssn | SSN |
-| dob fields | DOB (split) |
-| gender | Gender |
-| cc_number | Card Number |
-| pay_ccexpmonth | Exp. Month |
-| pay_ccexpyear | Exp. Year |
-| pay_cccvv2 | CVV |
-| pay_address | Billing Address Line 1 |
-| pay_city | Billing City |
-| pay_state | Billing State |
-| pay_zipcode | Billing Zip |
+### Payment Information
+- Card Number: 4111111111111111 (Test Visa)
+- Expiration: 01/2030
+- CVV: 123
+- Billing Address: 123 Main St, Little Rock, AR 72201
 
 ## Features
 
-- Automatically fills all form fields with realistic test data
-- Can use real submission data from previous enrollments
+- Automatically fills all form fields with a single click
 - Properly selects Credit Card payment option
-- Handles AJAX validation to ensure credit card fields remain filled
-- Uses advanced techniques to prevent fields from being cleared
-- Triggers appropriate events to ensure form validation works correctly
-- Creates a complete test enrollment form submission
+- Handles form validation events
+- Provides test data for easy form testing
+- Allows filling with real submission data from Airtable
+- Search for specific submissions by name
 
-## Notes About Credit Card Handling
+## Notes
 
-The extension uses special techniques to handle credit card fields which may be cleared by AJAX validation:
-
-1. **Sequential Field Population**: Fields are filled in a strategic sequence to minimize AJAX interference
-2. **AJAX Interception**: The extension temporarily blocks validation AJAX calls that might clear fields
-3. **Mutation Observation**: A mutation observer is used to detect and prevent field clearing
-4. **Value Property Monitoring**: DOM property setters are monitored to prevent unwanted value changes
-5. **Delayed Verification**: The extension performs a final check after all operations to ensure values remain set
-
-If you notice credit card fields still being cleared, you can try adjusting the timing values in the code or using a different test credit card number.
+- The extension will attempt to fill all available fields based on the selected data source
+- For security reasons, the extension only works on the specific enrollment form page
+- If an "Invalid Number" message appears for the credit card, it may be due to custom validation on the form
 
 ## Icon Replacement
 
-Replace the placeholder icon files in the `images` directory with your own icons in the following sizes:
-- icon16.png (16x16 pixels)
-- icon48.png (48x48 pixels)
-- icon128.png (128x128 pixels) 
+The included icons are placeholders. For a complete extension, replace these with proper icons:
+- icon16.png (16x16)
+- icon48.png (48x48)
+- icon128.png (128x128)
+
+## Fetching Real Submissions
+
+The extension now supports fetching real submissions from Airtable. To load real submissions:
+
+1. Click the "Refresh Submissions" button in the popup
+2. The extension will attempt to connect to Airtable and fetch all submissions
+3. If successful, you'll see the updated submission count and can search by name
+
+If you're having trouble connecting to Airtable directly from the extension, you can run the standalone script:
+
+```bash
+cd /Users/eugeneleychenko/Downloads/ls-form-2_22_1
+node submission.js
+```
+
+This will fetch all submissions from Airtable and log them to the console. The extension will try to use these fetched submissions when available. 

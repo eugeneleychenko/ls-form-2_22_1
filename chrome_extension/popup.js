@@ -1,41 +1,452 @@
-document.getElementById('prefillButton').addEventListener('click', async () => {
-  try {
-    // Get the selected data source
-    const dataSource = document.querySelector('input[name="dataSource"]:checked').value;
-    console.log(`Using ${dataSource} data for form filling`);
+// Variables to store selected submission
+let selectedSubmission = null;
+
+// Global debounced search function
+let debouncedSearchFunction = null;
+
+/**
+ * Creates a debounced function that delays invoking func until after wait milliseconds have elapsed
+ * @param {Function} func - The function to debounce
+ * @param {number} wait - The number of milliseconds to delay
+ * @return {Function} The debounced function
+ */
+function debounce(func, wait) {
+  let timeout;
+  
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
     
-    // Get the current active tab
-    let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    
-    // First try sending a message to the content script with the data source preference
-    chrome.tabs.sendMessage(tab.id, { action: 'fillForm', dataSource: dataSource }, (response) => {
-      // If we get a response, great!
-      if (response && response.status === 'success') {
-        console.log(`Form filled successfully with ${dataSource} data via content script!`);
-      } 
-      // If there's an error (like content script not being loaded), fallback to executeScript
-      else if (chrome.runtime.lastError) {
-        console.log('Content script not available, using executeScript fallback');
-        
-        // Execute script directly in the page context
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          function: fillForm,
-          args: [dataSource]
-        }).then(() => {
-          console.log(`Form filled successfully with ${dataSource} data via executeScript!`);
-        }).catch(err => {
-          console.error('Failed to fill form:', err);
-        });
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Add event listeners once the popup is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Get DOM elements
+  const dataSourceRadios = document.querySelectorAll('input[name="dataSource"]');
+  const searchContainer = document.getElementById('searchContainer');
+  const nameSearchInput = document.getElementById('nameSearch');
+  const searchResultsDiv = document.getElementById('searchResults');
+  const selectedPersonDiv = document.getElementById('selectedPerson');
+  const prefillButton = document.getElementById('prefillButton');
+  const refreshButton = document.getElementById('refreshButton');
+  const statusMessage = document.getElementById('statusMessage');
+  const submissionCountBadge = document.getElementById('submissionCount');
+  
+  // Add change event listeners to radio buttons
+  dataSourceRadios.forEach(radio => {
+    radio.addEventListener('change', function() {
+      if (this.value === 'search') {
+        searchContainer.style.display = 'block';
+        prefillButton.textContent = 'Fill Form with Selected Person';
+        prefillButton.disabled = !selectedSubmission;
+      } else {
+        searchContainer.style.display = 'none';
+        prefillButton.textContent = this.value === 'real' ? 
+          'Fill Form with Real Submission' : 'Fill Form with Test Data';
+        prefillButton.disabled = false;
       }
     });
-  } catch (error) {
-    console.error('Error:', error);
+  });
+  
+  // Add event listener to prefill button
+  prefillButton.addEventListener('click', function() {
+    // Get selected data source
+    const selectedDataSource = document.querySelector('input[name="dataSource"]:checked').value;
+    
+    // Get active tab
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      // Send message to content script with data source
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'fillForm',
+        dataSource: selectedDataSource,
+        submission: selectedSubmission
+      });
+      
+      // Close popup
+      window.close();
+    });
+  });
+  
+  // Add event listener to refresh button
+  refreshButton.addEventListener('click', function() {
+    statusMessage.textContent = 'Refreshing submissions from Airtable...';
+    refreshButton.disabled = true;
+    submissionCountBadge.textContent = '...';
+    
+    // Clear the cache and reinitialize the search
+    chrome.runtime.sendMessage({ action: 'clearCache' }, function(response) {
+      if (response && response.status === 'success') {
+        console.log('Cache cleared successfully, fetching new submissions');
+        // Reinitialize the search with force refresh
+        initializeSearchAutocomplete(true);
+      } else {
+        statusMessage.textContent = 'Failed to refresh submissions';
+        refreshButton.disabled = false;
+        submissionCountBadge.textContent = '0';
+      }
+    });
+  });
+  
+  // Initialize the search functionality
+  initializeSearchAutocomplete();
+  
+  // Function to initialize search autocomplete with submissions
+  function initializeSearchAutocomplete(forceRefresh = false) {
+    statusMessage.textContent = 'Loading submissions...';
+    refreshButton.disabled = true;
+    
+    // Get the active tab
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (!tabs || !tabs[0]) {
+        statusMessage.textContent = 'No active tab found';
+        refreshButton.disabled = false;
+        return;
+      }
+      
+      // Send message to content script to get submissions
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'getSubmissions',
+        forceRefresh: forceRefresh
+      }, function(response) {
+        console.log('Received getSubmissions response:', response);
+        
+        if (chrome.runtime.lastError) {
+          statusMessage.textContent = 'Error: ' + chrome.runtime.lastError.message;
+          refreshButton.disabled = false;
+          return;
+        }
+        
+        if (response && response.status === 'success' && response.submissions) {
+          // Update the submission count badge
+          submissionCountBadge.textContent = response.submissions.length;
+          
+          // Setup the autocomplete with submissions
+          setupAutocomplete(response.submissions);
+          
+          // Update status
+          statusMessage.textContent = `Loaded ${response.submissions.length} submissions`;
+          refreshButton.disabled = false;
+          
+          // Auto-select the Search by Name option if we have submissions
+          if (response.submissions.length > 0) {
+            const searchDataRadio = document.getElementById('searchData');
+            if (searchDataRadio) {
+              searchDataRadio.checked = true;
+              // Trigger the change event
+              const event = new Event('change');
+              searchDataRadio.dispatchEvent(event);
+              // Focus the search input
+              setTimeout(() => {
+                nameSearchInput.focus();
+              }, 100);
+            }
+          }
+        } else {
+          // Handle error
+          statusMessage.textContent = response && response.error ? 
+            'Error: ' + response.error : 
+            'Failed to load submissions';
+          submissionCountBadge.textContent = '0';
+          refreshButton.disabled = false;
+        }
+      });
+    });
+    
+    // Also fetch the submission count for display
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (!tabs || !tabs[0]) return;
+      
+      chrome.tabs.sendMessage(tabs[0].id, {
+        action: 'getSubmissionCount'
+      }, function(response) {
+        console.log('Received getSubmissionCount response:', response);
+        
+        if (chrome.runtime.lastError) return;
+        
+        if (response && response.status === 'success' && response.count !== undefined) {
+          submissionCountBadge.textContent = response.count;
+        } else {
+          submissionCountBadge.textContent = '0';
+        }
+      });
+    });
   }
+  
+  // Setup autocomplete with the fetched submissions
+  function setupAutocomplete(submissions) {
+    // Clear previous event listeners
+    nameSearchInput.removeEventListener('input', debouncedSearchFunction);
+    
+    // Clear any previous results
+    searchResultsDiv.innerHTML = '';
+    searchResultsDiv.style.display = 'none';
+    
+    // Create the search function
+    const searchFunction = function() {
+      const query = nameSearchInput.value.trim();
+      console.log('Search query:', query);
+      
+      // Clear previous results
+      searchResultsDiv.innerHTML = '';
+      
+      if (query.length < 2) {
+        console.log('Query too short - need at least 2 characters');
+        searchResultsDiv.innerHTML = '<div class="search-result">Enter at least 2 characters to search</div>';
+        searchResultsDiv.style.display = 'block';
+        return;
+      }
+      
+      // Show loading indicator
+      searchResultsDiv.innerHTML = '<div class="search-result">Searching...</div>';
+      searchResultsDiv.style.display = 'block';
+      
+      // Get active tab
+      chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (!tabs || !tabs[0]) {
+          console.error('No active tab found');
+          showErrorMessage('No active tab found to search');
+          return;
+        }
+        
+        console.log('Sending search request to content script:', query);
+        
+        // Send message to content script to search submissions
+        chrome.tabs.sendMessage(tabs[0].id, {
+          action: 'searchSubmissions',
+          query: query
+        }, function(response) {
+          console.log('Received searchSubmissions response:', response);
+          
+          if (chrome.runtime.lastError) {
+            console.error('Runtime error:', chrome.runtime.lastError);
+            showErrorMessage('Error: ' + chrome.runtime.lastError.message);
+            return;
+          }
+          
+          if (response && response.status === 'success') {
+            if (response.results && response.results.length > 0) {
+              console.log('Search successful, found', response.results.length, 'results');
+              displaySearchResults(response.results);
+            } else {
+              console.log('Search completed but no results found for:', query);
+              searchResultsDiv.innerHTML = '<div class="search-result">No results found</div>';
+              searchResultsDiv.style.display = 'block';
+            }
+          } else if (response && response.status === 'error') {
+            console.error('Search error:', response.error);
+            showErrorMessage('Error: ' + response.error);
+          } else {
+            console.warn('Unexpected response:', response);
+            showErrorMessage('No response from search');
+          }
+        });
+      });
+    };
+    
+    // Create debounced version of the search function
+    debouncedSearchFunction = debounce(searchFunction, 300);
+    
+    // Add the input event listener
+    console.log("Adding input event listener");
+    nameSearchInput.addEventListener('input', debouncedSearchFunction);
+    
+    // Add a direct event listener for debugging
+    nameSearchInput.addEventListener('keyup', function(e) {
+      console.log('Keyup event on search input:', e.key, 'Current value:', nameSearchInput.value);
+    });
+    
+    // Also add a direct change event listener
+    nameSearchInput.addEventListener('change', function() {
+      console.log('Change event on search input. Current value:', nameSearchInput.value);
+    });
+  }
+  
+  // Display the filtered search results
+  function displaySearchResults(results) {
+    searchResultsDiv.innerHTML = '';
+    
+    if (!results || results.length === 0) {
+      console.log('No search results to display');
+      searchResultsDiv.innerHTML = '<div class="search-result">No results found</div>';
+      searchResultsDiv.style.display = 'block';
+      return;
+    }
+    
+    console.log('Displaying', results.length, 'search results');
+    
+    results.forEach((submission, index) => {
+      const resultDiv = document.createElement('div');
+      resultDiv.className = 'search-result';
+      
+      const fields = submission.fields;
+      if (!fields) {
+        console.warn('Submission has no fields:', submission);
+        return;
+      }
+      
+      // Use the getFormattedName function if available in this context
+      let name;
+      
+      // Get first name (trying all possible field names)
+      const firstName = 
+        (fields.firstName || '') ||
+        (fields.firstname || '') ||
+        (fields.FirstName || '') ||
+        (fields["First Name"] || '') ||
+        (fields["first name"] || '') ||
+        (fields["first_name"] || '');
+      
+      // Get last name (trying all possible field names)
+      const lastName = 
+        (fields.lastName || '') ||
+        (fields.lastname || '') ||
+        (fields.LastName || '') ||
+        (fields["Last Name"] || '') ||
+        (fields["last name"] || '') ||
+        (fields["last_name"] || '');
+      
+      // Format name as "Last, First" or just use whatever we have
+      name = firstName || lastName ? 
+        `${lastName ? lastName + (firstName ? ', ' : '') : ''}${firstName}` : 
+        'Unknown';
+      
+      console.log(`Result ${index}: ${name}`);
+      
+      resultDiv.textContent = name;
+      resultDiv.addEventListener('click', function() {
+        console.log('Selected submission:', submission);
+        selectSubmission(submission);
+      });
+      
+      searchResultsDiv.appendChild(resultDiv);
+    });
+    
+    searchResultsDiv.style.display = 'block';
+  }
+  
+  // Handle when a user selects a submission from the search results
+  function selectSubmission(submission) {
+    console.log('Selecting submission:', submission);
+    selectedSubmission = submission;
+    
+    const fields = submission.fields;
+    if (!fields) {
+      console.warn('Selected submission has no fields:', submission);
+      return;
+    }
+    
+    // Get name parts from fields
+    const firstName = 
+      (fields.firstName || '') ||
+      (fields.firstname || '') ||
+      (fields.FirstName || '') ||
+      (fields["First Name"] || '') ||
+      (fields["first name"] || '') ||
+      (fields["first_name"] || '');
+    
+    const lastName = 
+      (fields.lastName || '') ||
+      (fields.lastname || '') ||
+      (fields.LastName || '') ||
+      (fields["Last Name"] || '') ||
+      (fields["last name"] || '') ||
+      (fields["last_name"] || '');
+    
+    // Format name as "Last, First" or just use whatever we have
+    const name = firstName || lastName ? 
+      `${lastName ? lastName + (firstName ? ', ' : '') : ''}${firstName}` : 
+      'Unknown';
+    
+    // Update the UI
+    selectedPersonDiv.textContent = `Selected: ${name}`;
+    selectedPersonDiv.style.display = 'block';
+    searchResultsDiv.style.display = 'none';
+    
+    // Enable the prefill button
+    prefillButton.textContent = 'Fill Form with Selected Person';
+    prefillButton.disabled = false;
+  }
+  
+  // Show error message in the search container
+  function showErrorMessage(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.style.color = '#cc0000';
+    errorDiv.style.marginTop = '5px';
+    errorDiv.textContent = message;
+    
+    searchContainer.appendChild(errorDiv);
+  }
+  
+  // Prefill button click event
+  prefillButton.addEventListener('click', async () => {
+    try {
+      // Get the selected data source
+      const dataSource = document.querySelector('input[name="dataSource"]:checked').value;
+      let submissionToUse = null;
+      
+      if (dataSource === 'search') {
+        if (!selectedSubmission) {
+          alert('Please select a person from the search results first.');
+          return;
+        }
+        submissionToUse = selectedSubmission;
+      }
+      
+      console.log(`Using ${dataSource} data for form filling`);
+      
+      // Get the current active tab
+      let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      
+      // First try sending a message to the content script with the data source preference
+      chrome.tabs.sendMessage(tab.id, { 
+        action: 'fillForm', 
+        dataSource: dataSource,
+        submission: submissionToUse 
+      }, (response) => {
+        // If we get a response, great!
+        if (response && response.status === 'success') {
+          console.log(`Form filled successfully with ${dataSource} data via content script!`);
+        } 
+        // If there's an error (like content script not being loaded), fallback to executeScript
+        else if (chrome.runtime.lastError) {
+          console.log('Content script not available, using executeScript fallback');
+          
+          // Execute script directly in the page context
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: fillForm,
+            args: [dataSource, submissionToUse]
+          }).then(() => {
+            console.log(`Form filled successfully with ${dataSource} data via executeScript!`);
+          }).catch(err => {
+            console.error('Failed to fill form:', err);
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  });
+  
+  // Initial submission count update
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    if (tabs[0]) {
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'getSubmissionCount' }, function(response) {
+        if (!chrome.runtime.lastError && response && response.count) {
+          submissionCountBadge.textContent = response.count;
+        }
+      });
+    }
+  });
 });
 
 // This function will be injected into the page if needed
-function fillForm(dataSource = 'test') {
+function fillForm(dataSource = 'test', customSubmission = null) {
   // Function to fill the form with test data
   // Define the submission data here since it can't be passed from the popup
   function loadPreviousSubmission() {
@@ -253,7 +664,11 @@ function fillForm(dataSource = 'test') {
   
   let testData;
   
-  if (dataSource === 'real') {
+  if (dataSource === 'search' && customSubmission) {
+    // Use the custom submission selected from search
+    console.log('Using custom submission from search:', customSubmission);
+    testData = mapSubmissionToFormData(customSubmission);
+  } else if (dataSource === 'real') {
     // Load and map real submission data
     const submission = loadPreviousSubmission();
     testData = mapSubmissionToFormData(submission);

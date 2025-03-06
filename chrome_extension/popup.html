@@ -4,54 +4,150 @@
   <title>Form Prefiller</title>
   <style>
     body {
-      width: 220px;
-      padding: 10px;
       font-family: Arial, sans-serif;
+      width: 280px;
+      padding: 10px;
     }
+    
+    h1 {
+      font-size: 18px;
+      margin-bottom: 10px;
+    }
+    
+    p {
+      font-size: 14px;
+      margin-bottom: 15px;
+    }
+    
+    .data-source {
+      margin-bottom: 15px;
+    }
+    
+    .radio-option {
+      margin-bottom: 8px;
+    }
+    
     button {
-      width: 100%;
-      padding: 8px;
       background-color: #4285F4;
       color: white;
       border: none;
+      padding: 8px 15px;
       border-radius: 4px;
       cursor: pointer;
-      font-weight: bold;
-      margin-top: 10px;
+      font-size: 14px;
+      width: 100%;
+      margin-bottom: 8px;
     }
+    
     button:hover {
       background-color: #3367D6;
     }
-    .data-select {
-      margin-bottom: 10px;
+    
+    #refreshButton {
+      background-color: #34A853;
+      margin-top: 8px;
+      font-size: 12px;
+      padding: 6px;
     }
-    h3 {
-      margin-top: 0;
-      color: #333;
+    
+    #refreshButton:hover {
+      background-color: #2E8B57;
     }
-    label {
-      display: block;
-      margin-bottom: 5px;
+    
+    #searchContainer {
+      display: none;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 8px;
+      background-color: #f9f9f9;
+    }
+    
+    #nameSearch {
+      width: 100%;
+      padding: 6px;
+      margin-bottom: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-sizing: border-box;
+    }
+    
+    #searchResults {
+      max-height: 150px;
+      overflow-y: auto;
+      display: none;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      background-color: white;
+    }
+    
+    .search-result {
+      padding: 6px 8px;
       cursor: pointer;
+      border-bottom: 1px solid #eee;
     }
-    input[type="radio"] {
-      margin-right: 5px;
+    
+    .search-result:hover {
+      background-color: #f0f0f0;
+    }
+    
+    #selectedPerson {
+      display: none;
+      margin-top: 5px;
+      font-weight: bold;
+      color: #4285F4;
+    }
+    
+    .status-message {
+      font-size: 12px;
+      color: #666;
+      margin-top: 10px;
+      text-align: center;
+      font-style: italic;
+    }
+    
+    .count-badge {
+      display: inline-block;
+      background-color: #4285F4;
+      color: white;
+      border-radius: 10px;
+      font-size: 10px;
+      padding: 2px 6px;
+      margin-left: 5px;
     }
   </style>
 </head>
 <body>
-  <h3>Form Prefiller</h3>
+  <h1>Form Prefiller</h1>
+  <p>Select a data source and click the button to fill the form.</p>
   
-  <div class="data-select">
-    <label>
-      <input type="radio" name="dataSource" value="test" checked> Use Test Data
-    </label>
-    <label>
-      <input type="radio" name="dataSource" value="real"> Use Real Submission
-    </label>
+  <div class="data-source">
+    <div class="radio-option">
+      <input type="radio" id="testData" name="dataSource" value="test" checked>
+      <label for="testData">Use Test Data</label>
+    </div>
+    <div class="radio-option">
+      <input type="radio" id="realData" name="dataSource" value="real">
+      <label for="realData">Use Real Submission</label>
+    </div>
+    <div class="radio-option">
+      <input type="radio" id="searchData" name="dataSource" value="search">
+      <label for="searchData">Search by Name <span id="submissionCount" class="count-badge">0</span></label>
+    </div>
   </div>
   
-  <button id="prefillButton">Fill Form with Data</button>
+  <div id="searchContainer">
+    <input type="text" id="nameSearch" placeholder="Enter first or last name...">
+    <div id="searchResults"></div>
+    <div id="selectedPerson"></div>
+  </div>
+  
+  <button id="prefillButton">Fill Form with Test Data</button>
+  <button id="refreshButton">Refresh Submissions</button>
+  
+  <div id="statusMessage" class="status-message"></div>
+  
   <script src="popup.js"></script>
 </body>
 </html> 

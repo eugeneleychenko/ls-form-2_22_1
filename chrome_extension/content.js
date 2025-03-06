@@ -2,14 +2,232 @@
 console.log('Form Prefiller extension is loaded and ready!');
 
 // Listen for messages from the popup
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('Message received in content script:', message);
+chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
+  console.log("Content script received message:", request.action);
   
-  if (message.action === 'fillForm') {
-    fillForm(message.dataSource);
-    sendResponse({ status: 'success' });
+  // Handle form filling with different data sources
+  if (request.action === 'fillForm') {
+    console.log("Filling form with data source:", request.dataSource);
+    
+    if (request.dataSource === 'search' && request.submission) {
+      // Fill form with the selected submission from search
+      console.log("Using search submission:", request.submission);
+      fillFormWithSubmission(request.submission);
+    }
+    else if (request.dataSource === 'real') {
+      // Fill form with real submission data
+      console.log("Using real data");
+      const submission = loadPreviousSubmission();
+      fillFormWithSubmission(submission);
+    }
+    else {
+      // Default: Fill form with test data
+      console.log("Using test data");
+      const submission = createTestSubmission();
+      fillFormWithSubmission(submission);
+    }
+    
+    sendResponse({status: 'success'});
     return true;
   }
+  
+  // Handle fetching submissions (with option to force refresh)
+  else if (request.action === 'getSubmissions') {
+    console.log("Getting submissions, forceRefresh:", request.forceRefresh);
+    
+    // If force refresh is requested, clear the cache first
+    if (request.forceRefresh) {
+      console.log("Forcing refresh of submissions cache");
+      
+      // Clear the local cache
+      if (typeof submissionsCache !== 'undefined') {
+        console.log("Clearing local submissionsCache");
+        submissionsCache = []; 
+      }
+      
+      // Also clear the background cache
+      chrome.runtime.sendMessage({ action: 'clearCache' }, function(response) {
+        console.log("Cache clear response:", response);
+        
+        // After clearing the cache, fetch submissions
+        if (typeof fetchSubmissions === 'function') {
+          console.log("Fetching fresh submissions after cache clear");
+          fetchSubmissions()
+            .then(submissions => {
+              console.log(`Fetched ${submissions.length} fresh submissions after cache clear`);
+              sendResponse({
+                status: 'success',
+                submissions: submissions
+              });
+            })
+            .catch(error => {
+              console.error("Error fetching fresh submissions:", error);
+              sendResponse({
+                status: 'error',
+                error: error.message
+              });
+            });
+        }
+      });
+      
+      return true;
+    }
+    
+    // For regular (non-force) fetches, just get the submissions
+    if (typeof fetchSubmissions === 'function') {
+      console.log("Fetching submissions normally");
+      fetchSubmissions()
+        .then(submissions => {
+          console.log(`Sending ${submissions.length} submissions to popup`);
+          sendResponse({
+            status: 'success',
+            submissions: submissions
+          });
+        })
+        .catch(error => {
+          console.error("Error fetching submissions:", error);
+          sendResponse({
+            status: 'error',
+            error: error.message
+          });
+        });
+      
+      return true; // Will respond asynchronously
+    } else {
+      console.error("fetchSubmissions function not available");
+      sendResponse({
+        status: 'error',
+        error: "fetchSubmissions function not available"
+      });
+      return true;
+    }
+  }
+  
+  // Handle searching submissions by name
+  else if (request.action === 'searchSubmissions') {
+    console.log("Searching submissions for:", request.query);
+    
+    if (typeof searchSubmissionsByName === 'function') {
+      try {
+        // Make sure we have submissions loaded
+        if (typeof submissionsCache === 'undefined' || !submissionsCache || !submissionsCache.length) {
+          console.warn("Cannot search - submissions cache is empty");
+          sendResponse({
+            status: 'error',
+            error: "No submissions loaded to search"
+          });
+          return true;
+        }
+        
+        console.log(`Searching ${submissionsCache.length} submissions for "${request.query}"`);
+        
+        // Log some of the submissions to verify their data
+        console.log("Sample of submissions in cache:");
+        const sampleSubmissions = submissionsCache.slice(0, Math.min(5, submissionsCache.length));
+        sampleSubmissions.forEach((submission, i) => {
+          if (submission && submission.fields) {
+            // Check for different field name formats
+            const firstName = 
+              submission.fields.firstName || 
+              submission.fields.firstname || 
+              submission.fields.FirstName || 
+              submission.fields["First Name"] || 
+              submission.fields["first name"] || '';
+              
+            const lastName = 
+              submission.fields.lastName || 
+              submission.fields.lastname || 
+              submission.fields.LastName || 
+              submission.fields["Last Name"] || 
+              submission.fields["last name"] || '';
+              
+            console.log(`Sample ${i}: ${firstName} ${lastName} - Fields:`, JSON.stringify(submission.fields).substring(0, 100) + '...');
+          } else {
+            console.log(`Sample ${i}: Invalid submission or missing fields`);
+          }
+        });
+        
+        // Perform the search
+        const results = searchSubmissionsByName(request.query);
+        console.log(`Found ${results.length} matches for search "${request.query}"`);
+        
+        // Log a sample of the results for debugging
+        if (results.length > 0) {
+          console.log("Search result details:");
+          const sample = results.slice(0, Math.min(5, results.length));
+          sample.forEach((result, i) => {
+            const firstName = 
+              result.fields.firstName || 
+              result.fields.firstname || 
+              result.fields.FirstName || 
+              result.fields["First Name"] || 
+              result.fields["first name"] || '';
+              
+            const lastName = 
+              result.fields.lastName || 
+              result.fields.lastname || 
+              result.fields.LastName || 
+              result.fields["Last Name"] || 
+              result.fields["last name"] || '';
+              
+            console.log(`Result ${i}: ${firstName} ${lastName}`);
+          });
+          
+          // Send successful response with results
+          sendResponse({
+            status: 'success',
+            results: results
+          });
+        } else {
+          console.log("No matches found for search query:", request.query);
+          sendResponse({
+            status: 'success',
+            results: []
+          });
+        }
+      } catch (error) {
+        console.error("Error searching submissions:", error);
+        sendResponse({
+          status: 'error',
+          error: error.message || "Unknown error during search"
+        });
+      }
+    } else {
+      console.error("searchSubmissionsByName function not available");
+      sendResponse({
+        status: 'error',
+        error: "searchSubmissionsByName function not available"
+      });
+    }
+    
+    return true;
+  }
+  
+  // Handle getting submission count
+  else if (request.action === 'getSubmissionCount') {
+    console.log("Getting submission count");
+    
+    // Check if we have access to the submissions cache
+    if (typeof submissionsCache !== 'undefined') {
+      const count = submissionsCache.length;
+      console.log(`Submission count: ${count}`);
+      sendResponse({
+        status: 'success',
+        count: count
+      });
+    } else {
+      console.error("submissionsCache not available");
+      sendResponse({
+        status: 'error',
+        count: 0
+      });
+    }
+    
+    return true;
+  }
+  
+  // Always return true to indicate we'll respond asynchronously
+  return true;
 });
 
 // Function to load and parse the previous submission data
@@ -116,14 +334,22 @@ function loadPreviousSubmission() {
   return submissionData;
 }
 
-// Function to map submission data to form fields
+// Helper function to map submission data to form fields
 function mapSubmissionToFormData(submission) {
+  if (!submission || !submission.fields) {
+    console.error('Invalid submission data:', submission);
+    return {};
+  }
+  
   const fields = submission.fields;
+  console.log('Mapping submission fields:', Object.keys(fields));
   
   // Helper function to split phone numbers
   function splitPhone(phone) {
     // Remove all non-numeric characters
-    const cleaned = phone.replace(/\D/g, '');
+    if (!phone) return { first: '', second: '', third: '' };
+    
+    const cleaned = phone.toString().replace(/\D/g, '');
     return {
       first: cleaned.substring(0, 3),
       second: cleaned.substring(3, 6),
@@ -133,44 +359,197 @@ function mapSubmissionToFormData(submission) {
   
   // Helper function to split date (YYYY-MM-DD format)
   function splitDate(date) {
-    const parts = date.split('-');
-    return {
-      year: parts[0],
-      month: parseInt(parts[1], 10).toString(), // Remove leading zero
-      day: parseInt(parts[2], 10).toString()    // Remove leading zero
-    };
+    if (!date) return { year: '', month: '', day: '' };
+    
+    // Handle multiple date formats
+    let parts;
+    if (typeof date === 'string' && date.includes('-')) {
+      parts = date.split('-');
+    } else if (typeof date === 'string' && date.includes('/')) {
+      parts = date.split('/');
+      // Adjust for MM/DD/YYYY format
+      if (parts.length === 3 && parts[2].length === 4) {
+        return {
+          year: parts[2],
+          month: parseInt(parts[0], 10).toString(), // Remove leading zero
+          day: parseInt(parts[1], 10).toString()    // Remove leading zero
+        };
+      }
+    } else {
+      console.warn('Unable to parse date:', date);
+      return { year: '', month: '', day: '' };
+    }
+    
+    // Standard YYYY-MM-DD format
+    if (parts && parts.length === 3) {
+      return {
+        year: parts[0],
+        month: parseInt(parts[1], 10).toString(), // Remove leading zero
+        day: parseInt(parts[2], 10).toString()    // Remove leading zero
+      };
+    }
+    
+    console.warn('Unexpected date format:', date);
+    return { year: '', month: '', day: '' };
   }
   
-  // Map the submission fields to form fields
-  const cellPhone = splitPhone(fields["Cell Phone"] || "");
-  const workPhone = splitPhone(fields["Work Phone"] || "");
-  const dob = splitDate(fields["DOB"] || "");
+  // Helper function to get the first non-empty value from multiple field names
+  function getFieldValue(possibleFieldNames, defaultValue = "") {
+    for (const fieldName of possibleFieldNames) {
+      const value = fields[fieldName];
+      if (value !== undefined && value !== null && value !== "") {
+        return value;
+      }
+    }
+    return defaultValue;
+  }
   
-  // Log DOB information for debugging
-  console.log('DOB from submission:', fields["DOB"]);
+  // Get name fields with multiple possible field names
+  const firstName = getFieldValue([
+    "firstName", "firstname", "FirstName", "First Name", "first name", "first_name"
+  ]);
+  
+  const lastName = getFieldValue([
+    "lastName", "lastname", "LastName", "Last Name", "last name", "last_name"
+  ]);
+  
+  const middleName = getFieldValue([
+    "middleName", "middlename", "MiddleName", "Middle Name", "middle name", "middle_name"
+  ]);
+  
+  // Get address fields
+  const address1 = getFieldValue([
+    "Address Line 1", "Address", "address", "address1", "addressLine1", "street"
+  ]);
+  
+  const address2 = getFieldValue([
+    "Address Line 2", "address2", "addressLine2", "apt", "suite", "unit"
+  ]);
+  
+  const city = getFieldValue([
+    "City", "city"
+  ]);
+  
+  const state = getFieldValue([
+    "State", "state"
+  ]);
+  
+  const zipcode = getFieldValue([
+    "Zip", "zip", "zipcode", "Zip Code", "zip code", "postal"
+  ]).toString().replace(/,/g, '');
+  
+  // Get phone numbers
+  const cellPhone = splitPhone(getFieldValue([
+    "Cell Phone", "cellPhone", "cell", "phone", "Phone", "mobile", "Mobile Phone"
+  ]));
+  
+  const workPhone = splitPhone(getFieldValue([
+    "Work Phone", "workPhone", "work", "office", "Office Phone", "business", "Business Phone", "alternatePhone"
+  ]));
+  
+  // Get email
+  const email = getFieldValue([
+    "email", "Email", "e-mail", "emailAddress", "Email Address"
+  ]);
+  
+  // Get SSN
+  const ssn = getFieldValue([
+    "SSN", "ssn", "Social Security", "social security number", "Social Security Number"
+  ]);
+  
+  // Get DOB fields
+  const dobValue = getFieldValue([
+    "DOB", "dob", "Date of Birth", "dateOfBirth", "birthDate", "Birth Date"
+  ]);
+  const dob = splitDate(dobValue);
+  console.log('DOB from submission:', dobValue);
   console.log('Parsed DOB values:', dob);
+  
+  // Get gender
+  const genderValue = getFieldValue([
+    "Gender", "gender", "sex", "Sex"
+  ]);
   
   // Convert gender to single character format if needed
   const genderMap = {
     "male": "M",
-    "female": "F"
+    "female": "F",
+    "m": "M",
+    "f": "F"
   };
   
-  const gender = genderMap[fields["Gender"].toLowerCase()] || fields["Gender"];
+  const gender = genderValue ? 
+    (genderMap[genderValue.toString().toLowerCase()] || genderValue) : 'M';
+  
+  // Get agent
+  const agent = getFieldValue([
+    "Agent", "agent", "Agent Name", "agent name", "AgentName"
+  ]);
+  
+  // Get notes
+  const notes = getFieldValue([
+    "Notes", "notes", "Comments", "comments", "Additional Notes", "additional notes"
+  ]);
+  
+  // Get dependent/beneficiary info
+  const dependentRelationship = getFieldValue([
+    "Dependent 2 Relationship", "dependent relationship", "beneficiary relationship"
+  ]);
+  
+  const dependentName = getFieldValue([
+    "Dependent 2 Name", "dependent name", "beneficiary name"
+  ]);
+  
+  const dependentDOB = splitDate(getFieldValue([
+    "Dependent 2 DOB", "dependent dob", "beneficiary dob"
+  ]));
+  
+  // Get payment info
+  const cardNumber = getFieldValue([
+    "Card Number", "cardNumber", "card number", "CC Number", "cc number", "credit card"
+  ]);
+  
+  const expMonth = getFieldValue([
+    "Exp. Month", "expMonth", "exp month", "cc exp month"
+  ]);
+  
+  const expYear = getFieldValue([
+    "Exp. Year", "expYear", "exp year", "cc exp year"
+  ]);
+  
+  const cvv = getFieldValue([
+    "CVV", "cvv", "security code", "Security Code", "cvc", "CVC"
+  ]).toString();
+  
+  const billingAddress = getFieldValue([
+    "Billing Address Line 1", "Billing Address", "billingAddress", "billing address"
+  ]);
+  
+  const billingCity = getFieldValue([
+    "Billing City", "billingCity", "billing city"
+  ]);
+  
+  const billingState = getFieldValue([
+    "Billing State", "billingState", "billing state"
+  ]);
+  
+  const billingZip = getFieldValue([
+    "Billing Zip", "billingZip", "billing zip", "billing zipcode"
+  ]).toString().replace(/,/g, '');
   
   // Create the data object with mapped fields
   return {
     // Member info
-    firstname: fields["firstName"] || "",
-    middlename: "", // Not in submission data
-    lastname: fields["lastName"] || "",
+    firstname: firstName,
+    middlename: middleName,
+    lastname: lastName,
     
     // Address
-    address: fields["Address Line 1"] || "",
-    address2: fields["Address Line 2"] || "",
-    city: fields["City"] || "",
-    state: fields["State"] || "",
-    zipcode: fields["Zip"] ? fields["Zip"].replace(/,/g, '') : "",
+    address: address1,
+    address2: address2,
+    city: city,
+    state: state,
+    zipcode: zipcode,
     
     // Contact
     phone1_1: cellPhone.first,
@@ -179,147 +558,176 @@ function mapSubmissionToFormData(submission) {
     phone2_1: workPhone.first,
     phone2_2: workPhone.second,
     phone2_3: workPhone.third,
-    email: fields["email"] || "",
-    email_confirm: fields["email"] || "",
+    email: email,
+    email_confirm: email,
     
     // Attributes
-    ssn: fields["SSN"] || "",
+    ssn: ssn,
     dobmonth: dob.month,
     dobday: dob.day,
     dobyear: dob.year,
     gender: gender,
     
     // Agent info
-    source_detail: fields["Agent"] || "",
+    source_detail: agent,
     
     // Notes
-    notes: fields["Notes"] || "",
+    notes: notes,
     
-    // Beneficiary info - using Dependent 2 (spouse) data
-    ben_relationship: fields["Dependent 2 Relationship"] || "",
-    ben_name: fields["Dependent 2 Name"] || "",
-    ben_address: fields["Address Line 1"] || "", // Assuming same address
-    ben_city: fields["City"] || "",
-    ben_state: fields["State"] || "",
-    ben_zipcode: fields["Zip"] ? fields["Zip"].replace(/,/g, '') : "",
+    // Beneficiary info
+    ben_relationship: dependentRelationship,
+    ben_name: dependentName,
+    ben_address: address1, // Assuming same address
+    ben_city: city,
+    ben_state: state,
+    ben_zipcode: zipcode,
     ben_phone1_1: cellPhone.first,
     ben_phone1_2: cellPhone.second,
     ben_phone1_3: cellPhone.third,
-    ben_DOBMonth: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).month : "",
-    ben_DOBDay: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).day : "",
-    ben_DOBYear: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).year : "",
+    ben_DOBMonth: dependentDOB.month,
+    ben_DOBDay: dependentDOB.day,
+    ben_DOBYear: dependentDOB.year,
     
     // Payment info - Credit Card
-    cc_number: fields["Card Number"] || "",
-    pay_ccexpmonth: fields["Exp. Month"] || "",
-    pay_ccexpyear: fields["Exp. Year"] || "",
-    pay_cccvv2: fields["CVV"] ? fields["CVV"].toString() : "",
-    pay_fname: fields["firstName"] || "",
-    pay_lname: fields["lastName"] || "",
-    pay_address: fields["Billing Address Line 1"] || "",
-    pay_city: fields["Billing City"] || "",
-    pay_state: fields["Billing State"] || "",
-    pay_zipcode: fields["Billing Zip"] ? fields["Billing Zip"].replace(/,/g, '') : "",
+    cc_number: cardNumber,
+    pay_ccexpmonth: expMonth,
+    pay_ccexpyear: expYear,
+    pay_cccvv2: cvv,
+    pay_fname: firstName,
+    pay_lname: lastName,
+    pay_address: billingAddress || address1, // fallback to main address if billing not specified
+    pay_city: billingCity || city,
+    pay_state: billingState || state,
+    pay_zipcode: billingZip || zipcode,
     
-    // Other fields remain the same
+    // Other fields - hardcoded dates for convenience
     pd_20277168_dtBilling: "03/06/2025",
     pd_20277168_dtEffective: "03/07/2025",
+    
+    // Text/Email communication
     send_text: cellPhone.first + cellPhone.second + cellPhone.third,
-    send_email: fields["email"] || ""
+    send_email: email
   };
 }
 
-// Function to fill the form with test or real submission data
-function fillForm(dataSource = 'test') {
-  console.log(`Filling form with ${dataSource} data from content script...`);
+// Function to fill form with submission data
+function fillFormWithSubmission(submission) {
+  console.log('Filling form with submission data:', submission);
   
-  let testData;
-  
-  if (dataSource === 'real') {
-    // Load and map real submission data
-    const submission = loadPreviousSubmission();
-    testData = mapSubmissionToFormData(submission);
-  } else {
-    // Use the original test data
-    testData = {
-      // Member info
-      firstname: "John",
-      middlename: "A",
-      lastname: "Doe",
-      
-      // Address
-      address: "123 Main St",
-      address2: "Apt 4B",
-      city: "Little Rock",
-      state: "AR", // Arkansas is pre-selected in the form
-      zipcode: "72201",
-      
-      // Contact
-      phone1_1: "555",
-      phone1_2: "123",
-      phone1_3: "4567",
-      phone2_1: "555",
-      phone2_2: "987",
-      phone2_3: "6543",
-      email: "test@example.com",
-      email_confirm: "test@example.com",
-      
-      // Attributes
-      ssn: "123-45-6789",
-      dobmonth: "1", // January
-      dobday: "15",
-      dobyear: "1980",
-      gender: "M",
-      
-      // Agent info
-      source_detail: "Test Agent",
-      
-      // Notes
-      notes: "This is a test enrollment",
-      
-      // Beneficiary info
-      ben_relationship: "Spouse",
-      ben_name: "Jane Doe",
-      ben_address: "123 Main St",
-      ben_city: "Little Rock",
-      ben_state: "AR",
-      ben_zipcode: "72201",
-      ben_phone1_1: "555",
-      ben_phone1_2: "123",
-      ben_phone1_3: "4567",
-      ben_DOBMonth: "2", // February
-      ben_DOBDay: "20",
-      ben_DOBYear: "1982",
-      
-      // Payment info - Credit Card
-      cc_number: "4111111111111111", // Test Visa number
-      pay_ccexpmonth: "01",
-      pay_ccexpyear: "2030",
-      pay_cccvv2: "123",
-      pay_fname: "John",
-      pay_lname: "Doe",
-      pay_address: "123 Main St",
-      pay_city: "Little Rock",
-      pay_state: "AR",
-      pay_zipcode: "72201",
-      
-      // Dates
-      pd_20277168_dtBilling: "03/06/2025",
-      pd_20277168_dtEffective: "03/07/2025",
-      
-      // Other
-      send_text: "5551234567",
-      send_email: "test@example.com"
-    };
-  }
+  // Map submission data to form fields
+  const formData = mapSubmissionToFormData(submission);
   
   // First, fill all non-payment fields
-  fillNonPaymentFields(testData);
+  fillNonPaymentFields(formData);
   
   // Then, handle the payment fields with special care
+  handlePaymentFields(formData);
+  
+  console.log('Form has been filled with submission data!');
+}
+
+// Function to fill form with real Airtable data
+function fillFormWithRealData() {
+  console.log('Filling form with real Airtable data');
+  
+  // Load previous submission data
+  const submission = loadPreviousSubmission();
+  if (!submission) {
+    console.error('No previous submission data available');
+    return;
+  }
+  
+  // Map submission to form data
+  const formData = mapSubmissionToFormData(submission);
+  
+  // Fill form with the mapped data
+  fillNonPaymentFields(formData);
+  handlePaymentFields(formData);
+  
+  console.log('Form has been filled with real submission data!');
+}
+
+// Existing test data function
+function fillFormWithTestData() {
+  console.log('Filling form with test data');
+  
+  // Use existing test data
+  const testData = {
+    // Member info
+    firstname: "John",
+    middlename: "A",
+    lastname: "Doe",
+    
+    // Address
+    address: "123 Main St",
+    address2: "Apt 4B",
+    city: "Little Rock",
+    state: "AR", // Arkansas is pre-selected in the form
+    zipcode: "72201",
+    
+    // Contact
+    phone1_1: "555",
+    phone1_2: "123",
+    phone1_3: "4567",
+    phone2_1: "555",
+    phone2_2: "987",
+    phone2_3: "6543",
+    email: "test@example.com",
+    email_confirm: "test@example.com",
+    
+    // Attributes
+    ssn: "123-45-6789",
+    dobmonth: "1", // January
+    dobday: "15",
+    dobyear: "1980",
+    gender: "M",
+    
+    // Agent info
+    source_detail: "Test Agent",
+    
+    // Notes
+    notes: "This is a test enrollment",
+    
+    // Beneficiary info
+    ben_relationship: "Spouse",
+    ben_name: "Jane Doe",
+    ben_address: "123 Main St",
+    ben_city: "Little Rock",
+    ben_state: "AR",
+    ben_zipcode: "72201",
+    ben_phone1_1: "555",
+    ben_phone1_2: "123",
+    ben_phone1_3: "4567",
+    ben_DOBMonth: "2", // February
+    ben_DOBDay: "20",
+    ben_DOBYear: "1982",
+    
+    // Payment info - Credit Card
+    cc_number: "4111111111111111", // Test Visa number
+    pay_ccexpmonth: "01",
+    pay_ccexpyear: "2030",
+    pay_cccvv2: "123",
+    pay_fname: "John",
+    pay_lname: "Doe",
+    pay_address: "123 Main St",
+    pay_city: "Little Rock",
+    pay_state: "AR",
+    pay_zipcode: "72201",
+    
+    // Dates
+    pd_20277168_dtBilling: "03/06/2025",
+    pd_20277168_dtEffective: "03/07/2025",
+    
+    // Other
+    send_text: "5551234567",
+    send_email: "test@example.com"
+  };
+  
+  // Fill form with test data
+  fillNonPaymentFields(testData);
   handlePaymentFields(testData);
   
-  console.log(`Form has been filled with ${dataSource} data!`);
+  console.log('Form has been filled with test data!');
 }
 
 // Function to fill all non-payment related fields
@@ -640,4 +1048,30 @@ function addMutationObserver(element, desiredValue) {
       return desiredValue;
     }
   });
+}
+
+/**
+ * Create a test submission object with sample data
+ * This is used when no real submissions are available
+ */
+function createTestSubmission() {
+  return {
+    fields: {
+      firstName: "John",
+      lastName: "Doe",
+      Gender: "male",
+      DOB: "1980-01-15",
+      "Cell Phone": "(555) 123-4567",
+      "Work Phone": "(555) 987-6543",
+      email: "test@example.com",
+      SSN: "123-45-6789",
+      "Address Line 1": "123 Main St",
+      "Address Line 2": "Apt 4B",
+      City: "Little Rock",
+      State: "AR",
+      Zip: "72201",
+      Notes: "Test submission",
+      Agent: "Test Agent"
+    }
+  };
 } 
