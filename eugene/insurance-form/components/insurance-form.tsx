@@ -316,15 +316,17 @@ export default function InsuranceForm() {
               {sections.map((section) => (
                 <div
                   key={section.id}
-                  className={`px-4 py-2 rounded-md cursor-pointer ${
+                  className={`flex items-center justify-center rounded-md cursor-pointer min-h-[40px] w-[120px] ${
                     activeSection === section.id ? "bg-primary text-white" : "bg-gray-100 hover:bg-gray-200"
                   } ${section.id === "basicInformation" && isDebugMode ? "ring-2 ring-amber-400" : ""}`}
                   onClick={() => scrollToSection(section.id)}
                   onDoubleClick={section.id === "basicInformation" ? toggleDebugMode : undefined}
                   title={section.id === "basicInformation" ? "Double-click to toggle debug mode" : undefined}
                 >
-                  {section.label}
-                  {section.id === "basicInformation" && isDebugMode && <span className="ml-2 text-xs">🔍</span>}
+                  <span className="text-center block">
+                    {section.label}
+                    {section.id === "basicInformation" && isDebugMode && <span className="ml-1 text-xs">🔍</span>}
+                  </span>
                 </div>
               ))}
             </div>
