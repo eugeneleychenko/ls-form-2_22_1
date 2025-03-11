@@ -297,9 +297,19 @@ document.addEventListener('DOMContentLoaded', function() {
         `${lastName ? lastName + (firstName ? ', ' : '') : ''}${firstName}` : 
         'Unknown';
       
-      console.log(`Result ${index}: ${name}`);
+      // Extract creation date and format as MM/DD
+      let createdDate = '';
+      if (submission._rawJson && submission._rawJson.createdTime) {
+        const date = new Date(submission._rawJson.createdTime);
+        createdDate = `(${(date.getMonth() + 1)}/${date.getDate()})`;
+      }
       
-      resultDiv.textContent = name;
+      // Append the date to the name
+      const nameWithDate = `${name} ${createdDate}`;
+      
+      console.log(`Result ${index}: ${nameWithDate}`);
+      
+      resultDiv.textContent = nameWithDate;
       resultDiv.addEventListener('click', function() {
         console.log('Selected submission:', submission);
         selectSubmission(submission);
@@ -344,8 +354,18 @@ document.addEventListener('DOMContentLoaded', function() {
       `${lastName ? lastName + (firstName ? ', ' : '') : ''}${firstName}` : 
       'Unknown';
     
+    // Extract creation date and format as MM/DD
+    let createdDate = '';
+    if (submission._rawJson && submission._rawJson.createdTime) {
+      const date = new Date(submission._rawJson.createdTime);
+      createdDate = `(${(date.getMonth() + 1)}/${date.getDate()})`;
+    }
+    
+    // Append the date to the name
+    const nameWithDate = `${name} ${createdDate}`;
+    
     // Update the UI
-    selectedPersonDiv.textContent = `Selected: ${name}`;
+    selectedPersonDiv.textContent = `Selected: ${nameWithDate}`;
     selectedPersonDiv.style.display = 'block';
     searchResultsDiv.style.display = 'none';
     
