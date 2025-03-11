@@ -21,9 +21,9 @@ const AIRTABLE_API_KEY = 'pat3NLTELYC7eiLLT.a86da8e760db4ba6602778112fe26d8ef892
  * This avoids loading external scripts and complies with Extension CSP
  * @returns {Promise<Array>} Airtable records
  */
-async function fetchFromAirtable() {
+async function fetchFromAirtable(showLogs = false) {
   try {
-    console.log('Fetching submissions directly from Airtable API');
+    if (showLogs) console.log('Fetching submissions directly from Airtable API');
     
     // Construct the Airtable API URL
     const apiUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
@@ -48,7 +48,7 @@ async function fetchFromAirtable() {
       throw new Error('Invalid response format from Airtable');
     }
     
-    console.log(`Successfully fetched ${data.records.length} records from Airtable API`);
+    if (showLogs) console.log(`Successfully fetched ${data.records.length} records from Airtable API`);
     
     // Convert to the expected format
     const records = data.records.map(record => ({
@@ -63,7 +63,7 @@ async function fetchFromAirtable() {
     
     return records;
   } catch (error) {
-    console.error('Error fetching from Airtable API:', error);
+    if (showLogs) console.error('Error fetching from Airtable API:', error);
     return null;
   }
 }
@@ -72,18 +72,18 @@ async function fetchFromAirtable() {
  * Attempt to load real submissions from the standalone submission.js
  * This checks if we're in an environment where the other script is available
  */
-async function tryLoadRealSubmissions() {
-  console.log('Attempting to load real submissions from Airtable...');
+async function tryLoadRealSubmissions(showLogs = false) {
+  if (showLogs) console.log('Attempting to load real submissions from Airtable...');
   
   // Try to fetch directly from Airtable
   try {
-    const records = await fetchFromAirtable();
+    const records = await fetchFromAirtable(showLogs);
     if (records && records.length > 0) {
-      console.log(`Successfully loaded ${records.length} real submissions from Airtable`);
+      if (showLogs) console.log(`Successfully loaded ${records.length} real submissions from Airtable`);
       return records;
     }
   } catch (directError) {
-    console.error('Error loading submissions directly from Airtable:', directError);
+    if (showLogs) console.error('Error loading submissions directly from Airtable:', directError);
   }
   
   // If direct fetch failed, check if the standalone script functions are available
@@ -95,7 +95,7 @@ async function tryLoadRealSubmissions() {
     
     if (hasRealFetch) {
       try {
-        console.log('Found real Airtable fetch function, using it to get submissions');
+        if (showLogs) console.log('Found real Airtable fetch function, using it to get submissions');
         // Use the appropriate function
         const fetchFunction = window.fetchAllSubmissions || 
                              window.getAllSubmissions || 
@@ -103,11 +103,11 @@ async function tryLoadRealSubmissions() {
         
         const realSubmissions = await fetchFunction();
         if (Array.isArray(realSubmissions) && realSubmissions.length > 0) {
-          console.log(`Successfully loaded ${realSubmissions.length} real submissions from Airtable`);
+          if (showLogs) console.log(`Successfully loaded ${realSubmissions.length} real submissions from Airtable`);
           return realSubmissions;
         }
       } catch (error) {
-        console.error('Error loading real submissions:', error);
+        if (showLogs) console.error('Error loading real submissions:', error);
       }
     }
   } 
@@ -132,11 +132,12 @@ async function tryLoadRealSubmissions() {
 /**
  * Fetches submissions from storage or generates test data
  * In a real implementation, this would fetch from Airtable
+ * @param {boolean} showLogs - Whether to show console logs, defaults to false
  */
-async function fetchSubmissions() {
+async function fetchSubmissions(showLogs = false) {
   // If already loading, don't start another fetch
   if (isLoadingSubmissions) {
-    console.log('Already loading submissions, waiting...');
+    if (showLogs) console.log('Already loading submissions, waiting...');
     return new Promise((resolve) => {
       // Check every 100ms if submissions are loaded
       const checkInterval = setInterval(() => {
@@ -150,43 +151,45 @@ async function fetchSubmissions() {
 
   // If we already have cached submissions, return them
   if (submissionsCache.length > 0) {
-    console.log('Using cached submissions:', submissionsCache.length);
+    if (showLogs) console.log('Using cached submissions:', submissionsCache.length);
     return submissionsCache;
   }
 
   isLoadingSubmissions = true;
-  console.log('Starting to fetch submissions...');
+  if (showLogs) console.log('Starting to fetch submissions...');
 
   try {
     // First try to load real submissions from Airtable
-    console.log('Attempting to load real submissions...');
-    const realSubmissions = await tryLoadRealSubmissions();
+    if (showLogs) console.log('Attempting to load real submissions...');
+    const realSubmissions = await tryLoadRealSubmissions(showLogs);
     
     if (realSubmissions && realSubmissions.length > 0) {
-      console.log(`Successfully loaded ${realSubmissions.length} real submissions`);
+      if (showLogs) console.log(`Successfully loaded ${realSubmissions.length} real submissions`);
       submissionsCache = realSubmissions;
       isLoadingSubmissions = false;
       
       // Debug output to inspect fields
-      submissionsCache.forEach((submission, index) => {
-        if (submission && submission.fields) {
-          const firstName = submission.fields.firstName || submission.fields.firstname || submission.fields["First Name"] || '';
-          const lastName = submission.fields.lastName || submission.fields.lastname || submission.fields["Last Name"] || '';
-          console.log(`Submission ${index} name fields: ${firstName} ${lastName}`);
-        }
-      });
+      if (showLogs) {
+        submissionsCache.forEach((submission, index) => {
+          if (submission && submission.fields) {
+            const firstName = submission.fields.firstName || submission.fields.firstname || submission.fields["First Name"] || '';
+            const lastName = submission.fields.lastName || submission.fields.lastname || submission.fields["Last Name"] || '';
+            console.log(`Submission ${index} name fields: ${firstName} ${lastName}`);
+          }
+        });
+      }
       
       // Cache these for future use
       if (chrome && chrome.runtime) {
         chrome.runtime.sendMessage(
           { action: 'cacheSubmissions', submissions: submissionsCache },
-          () => console.log('Cached real submissions from Airtable')
+          () => { if (showLogs) console.log('Cached real submissions from Airtable'); }
         );
       }
       
       return submissionsCache;
     } else {
-      console.log('No real submissions loaded, checking cache...');
+      if (showLogs) console.log('No real submissions loaded, checking cache...');
     }
     
     // If no real submissions, try to get submissions from local storage cache
@@ -680,10 +683,12 @@ function initializeWithTestData() {
 if (typeof chrome !== 'undefined' && chrome.runtime) {
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getSubmissions') {
-      fetchSubmissions().then(submissions => {
+      // Show logs only when forceRefresh is true (i.e., Refresh button clicked)
+      const showLogs = request.forceRefresh === true;
+      fetchSubmissions(showLogs).then(submissions => {
         sendResponse({ status: 'success', submissions: submissions });
       }).catch(error => {
-        console.error('Error fetching submissions:', error);
+        if (showLogs) console.error('Error fetching submissions:', error);
         sendResponse({ status: 'error', message: error.toString() });
       });
       return true; // Required for async response
@@ -700,5 +705,4 @@ if (typeof window !== 'undefined') {
   window.loadPreviousSubmission = loadPreviousSubmission;
 }
 
-// Initialize data on load
-fetchSubmissions().catch(error => console.error('Error initializing submissions:', error)); 
+// No longer initialize on load - only when Refresh button is clicked 

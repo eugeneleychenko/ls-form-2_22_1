@@ -44,7 +44,7 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         // After clearing the cache, fetch submissions
         if (typeof fetchSubmissions === 'function') {
           console.log("Fetching fresh submissions after cache clear");
-          fetchSubmissions()
+          fetchSubmissions(true) // Pass true to show logs when forcefully refreshing
             .then(submissions => {
               console.log(`Fetched ${submissions.length} fresh submissions after cache clear`);
               sendResponse({
@@ -59,40 +59,38 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
                 error: error.message
               });
             });
-        }
-      });
-      
-      return true;
-    }
-    
-    // For regular (non-force) fetches, just get the submissions
-    if (typeof fetchSubmissions === 'function') {
-      console.log("Fetching submissions normally");
-      fetchSubmissions()
-        .then(submissions => {
-          console.log(`Sending ${submissions.length} submissions to popup`);
-          sendResponse({
-            status: 'success',
-            submissions: submissions
-          });
-        })
-        .catch(error => {
-          console.error("Error fetching submissions:", error);
+        } else {
           sendResponse({
             status: 'error',
-            error: error.message
+            message: 'fetchSubmissions function not available'
           });
-        });
-      
-      return true; // Will respond asynchronously
-    } else {
-      console.error("fetchSubmissions function not available");
-      sendResponse({
-        status: 'error',
-        error: "fetchSubmissions function not available"
+        }
       });
-      return true;
+    } else {
+      // No force refresh, just get the current submissions
+      if (typeof fetchSubmissions === 'function') {
+        fetchSubmissions(false) // Pass false to hide logs when not forcefully refreshing
+          .then(submissions => {
+            sendResponse({
+              status: 'success',
+              submissions: submissions
+            });
+          })
+          .catch(error => {
+            sendResponse({
+              status: 'error',
+              error: error.message
+            });
+          });
+      } else {
+        sendResponse({
+          status: 'error',
+          message: 'fetchSubmissions function not available'
+        });
+      }
     }
+    
+    return true; // Will respond asynchronously
   }
   
   // Handle searching submissions by name
@@ -561,24 +559,24 @@ function mapSubmissionToFormData(submission) {
     gender: gender,
     
     // Agent info
-    source_detail: agent,
+    source_detail: "",
     
     // Notes
-    notes: notes,
+    notes: "",
     
     // Beneficiary info
-    ben_relationship: dependentRelationship,
-    ben_name: dependentName,
-    ben_address: address1, // Assuming same address
-    ben_city: city,
-    ben_state: state,
-    ben_zipcode: zipcode,
-    ben_phone1_1: cellPhone.first,
-    ben_phone1_2: cellPhone.second,
-    ben_phone1_3: cellPhone.third,
-    ben_DOBMonth: dependentDOB.month,
-    ben_DOBDay: dependentDOB.day,
-    ben_DOBYear: dependentDOB.year,
+    ben_relationship: "Estate",
+    ben_name: "Estate",
+    ben_address: "",
+    ben_city: "",
+    ben_state: "",
+    ben_zipcode: "",
+    ben_phone1_1: "",
+    ben_phone1_2: "",
+    ben_phone1_3: "",
+    ben_DOBMonth: "",
+    ben_DOBDay: "",
+    ben_DOBYear: "",
     
     // Payment info - Credit Card
     cc_number: cardNumber,

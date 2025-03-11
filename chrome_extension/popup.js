@@ -514,24 +514,24 @@ function fillForm(dataSource = 'search', customSubmission = null) {
       gender: gender,
       
       // Agent info
-      source_detail: fields["Agent"] || "",
+      source_detail: "",
       
       // Notes
-      notes: fields["Notes"] || "",
+      notes: "",
       
       // Beneficiary info - using Dependent 2 (spouse) data
-      ben_relationship: fields["Dependent 2 Relationship"] || "",
-      ben_name: fields["Dependent 2 Name"] || "",
-      ben_address: fields["Address Line 1"] || "", // Assuming same address
-      ben_city: fields["City"] || "",
-      ben_state: fields["State"] || "",
-      ben_zipcode: fields["Zip"] ? fields["Zip"].replace(/,/g, '') : "",
-      ben_phone1_1: cellPhone.first,
-      ben_phone1_2: cellPhone.second,
-      ben_phone1_3: cellPhone.third,
-      ben_DOBMonth: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).month : "",
-      ben_DOBDay: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).day : "",
-      ben_DOBYear: fields["Dependent 2 DOB"] ? splitDate(fields["Dependent 2 DOB"]).year : "",
+      ben_relationship: "Estate",
+      ben_name: "Estate",
+      ben_address: "",
+      ben_city: "",
+      ben_state: "",
+      ben_zipcode: "",
+      ben_phone1_1: "",
+      ben_phone1_2: "",
+      ben_phone1_3: "",
+      ben_DOBMonth: "",
+      ben_DOBDay: "",
+      ben_DOBYear: "",
       
       // Payment info - Credit Card
       cc_number: fields["Card Number"] || "",

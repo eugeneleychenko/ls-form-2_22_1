@@ -1,9 +1,13 @@
-##[x] for the beneficiary section, just make the 'relationshp' and 'name' be 'Estate'
-##[x] Ensure Sales Agent  name field remains blank
-##[x] Ensure 'Add notes' sectio is also blank
-##[x] Only fetch from airtable when clicking on 'Refresh Submissions'. Right now we have console logs of what is currerntly cached everytime i visit any page. dont do that. only show the logs when clicking on that button.
-##[x] when searching for the name in the search bar include the created date in (). So let's say the results will be "Brown, Bill", it'll look like "Brown, Bill (3/11)"
-##[x] Add dependents
+##[✅] for the beneficiary section, just make the 'relationshp' and 'name' be 'Estate'. keep the rest of that section blank.
+##[✅] Ensure Sales Agent  name field remains blank
+##[✅] Ensure 'Add notes' sectio is also blank
+##[✅] Only fetch from airtable when clicking on 'Refresh Submissions'. Right now we have console logs of what is currerntly cached everytime i visit any page. dont do that. only show the logs when clicking on that button.
+##[] when searching for the name in the search bar include the created date in (). So let's say the results will be "Brown, Bill", it'll look like "Brown, Bill (3/11)"
+
+##[] Add dependents
+
+you can only add one dependent at a time. So once you add the first one, you click on 'Save Dependant', which will save and blank the fields so the next one can be input.
+
 ###section looks like this
 <dependent section>
 
@@ -21,7 +25,7 @@
 					" style="float: right;"><div class="info"><p style="font-weight: normal; margin: 1px; padding: 0px; font-size: small;">To add/remove dependents please return to the first page. To edit please click the pencil below. </p></div></div> <div class="clear"><hr></div></fieldset>
 </dependent section>               
 
-Can you only add one dependent at a time. So once you add the first one, you click on 'Save Dependant', which will save and blank the fields so the next one can be input.
+you can only add one dependent at a time. So once you add the first one, you click on 'Save Dependant', which will save and blank the fields so the next one can be input.
 
 <dependent section 2nd dep>
 <div name="dep-form" id="dep-layout"><div id="dep_errors" style="border: 1px solid rgb(235, 204, 209); border-radius: 4px; color: rgb(169, 68, 66); background-color: rgb(242, 222, 222); padding: 15px; margin: 15px 0px 20px; display: none;"></div> <input type="hidden" name="bHideDepForm" value="0"> <input type="hidden" name="dep_id" value=""> <table border="0" cellpadding="0" cellspacing="0"><tbody><tr><td><label>
