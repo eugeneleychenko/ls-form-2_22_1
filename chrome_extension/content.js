@@ -1,6 +1,71 @@
 // This script runs when the page loads
 console.log('Form Prefiller extension is loaded and ready!');
 
+// Global variables to track dependents
+let dependentQueue = [];
+let currentDependentIndex = 0;
+let totalDependents = 0;
+
+// Helper function to split date (YYYY-MM-DD format) - moved to global scope for reuse
+function splitDate(date) {
+  if (!date) return { year: '', month: '', day: '' };
+  
+  // Handle multiple date formats
+  let parts;
+  if (typeof date === 'string' && date.includes('-')) {
+    parts = date.split('-');
+  } else if (typeof date === 'string' && date.includes('/')) {
+    parts = date.split('/');
+    // Adjust for MM/DD/YYYY format
+    if (parts.length === 3 && parts[2].length === 4) {
+      return {
+        year: parts[2],
+        month: parseInt(parts[0], 10).toString(), // Remove leading zero
+        day: parseInt(parts[1], 10).toString()    // Remove leading zero
+      };
+    }
+  } else {
+    console.warn('Unable to parse date:', date);
+    return { year: '', month: '', day: '' };
+  }
+  
+  // Standard YYYY-MM-DD format
+  if (parts && parts.length === 3) {
+    return {
+      year: parts[0],
+      month: parseInt(parts[1], 10).toString(), // Remove leading zero
+      day: parseInt(parts[2], 10).toString()    // Remove leading zero
+    };
+  }
+  
+  console.warn('Unexpected date format:', date);
+  return { year: '', month: '', day: '' };
+}
+
+// Helper function to split phone numbers - moved to global scope for reuse
+function splitPhone(phone) {
+  // Remove all non-numeric characters
+  if (!phone) return { first: '', second: '', third: '' };
+  
+  const cleaned = phone.toString().replace(/\D/g, '');
+  return {
+    first: cleaned.substring(0, 3),
+    second: cleaned.substring(3, 6),
+    third: cleaned.substring(6, 10)
+  };
+}
+
+// Helper function to get the first non-empty value from multiple field names - moved to global scope
+function getFieldValue(fields, possibleFieldNames, defaultValue = "") {
+  for (const fieldName of possibleFieldNames) {
+    const value = fields[fieldName];
+    if (value !== undefined && value !== null && value !== "") {
+      return value;
+    }
+  }
+  return defaultValue;
+}
+
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   console.log("Content script received message:", request.action);
@@ -324,6 +389,105 @@ function loadPreviousSubmission() {
   return submissionData;
 }
 
+// Extract all dependents from the submission data
+function extractAllDependents(fields) {
+  const dependents = [];
+  
+  // Helper function to extract a dependent by index (0-5)
+  function extractDependent(index) {
+    // Prefix is empty for first dependent, or "Dependent N " for others
+    const prefix = index === 0 ? "" : `Dependent ${index + 1} `;
+    
+    // Fields to look for
+    const nameField = index === 0 ? "Dependent Name" : `${prefix}Name`;
+    const relationshipField = index === 0 ? "Dependent Relationship" : `${prefix}Relationship`;
+    const genderField = index === 0 ? "Dependent Gender" : `${prefix}Gender`;
+    const dobField = index === 0 ? "Dependent DOB" : `${prefix}DOB`;
+    const ssnField = index === 0 ? "Dependent SSN" : `${prefix}SSN`;
+    
+    // Check if there's any data for this dependent
+    const hasName = fields[nameField];
+    const hasRelationship = fields[relationshipField];
+    const hasDOB = fields[dobField];
+    
+    // Only return a dependent if we have at least one key piece of information
+    if (hasName || hasRelationship || hasDOB) {
+      // Get the full name
+      let firstName = "";
+      let lastName = "";
+      if (hasName) {
+        const nameParts = fields[nameField].split(' ');
+        if (nameParts.length > 1) {
+          firstName = nameParts[0];
+          lastName = nameParts.slice(1).join(' ');
+        } else {
+          firstName = fields[nameField];
+        }
+      }
+      
+      // Normalize relationship
+      let relationship = fields[relationshipField] || "";
+      if (relationship && typeof relationship === 'string') {
+        relationship = relationship.toLowerCase();
+        if (relationship.includes('spouse') || relationship.includes('wife') || relationship.includes('husband')) {
+          relationship = 'Spouse';
+        } else if (relationship.includes('child') || relationship.includes('son') || relationship.includes('daughter')) {
+          relationship = 'Child';
+        } else {
+          relationship = 'Child'; // Default
+        }
+      } else {
+        relationship = 'Child'; // Default if not found
+      }
+      
+      // Normalize gender
+      let gender = fields[genderField] || "";
+      if (gender && typeof gender === 'string') {
+        gender = gender.toLowerCase();
+        if (gender.includes('male') || gender === 'm') {
+          gender = 'M';
+        } else if (gender.includes('female') || gender === 'f') {
+          gender = 'F';
+        }
+      }
+      
+      // Process DOB
+      let dobMonth = "";
+      let dobDay = "";
+      let dobYear = "";
+      if (hasDOB) {
+        const dobParts = splitDate(fields[dobField]);
+        dobMonth = dobParts.month;
+        dobDay = dobParts.day;
+        dobYear = dobParts.year;
+      }
+      
+      return {
+        firstName,
+        lastName,
+        relationship,
+        gender,
+        ssn: fields[ssnField] || "",
+        dobMonth,
+        dobDay,
+        dobYear
+      };
+    }
+    
+    return null;
+  }
+  
+  // Extract up to 6 dependents
+  for (let i = 0; i < 6; i++) {
+    const dependent = extractDependent(i);
+    if (dependent) {
+      dependents.push(dependent);
+    }
+  }
+  
+  return dependents;
+}
+
 // Helper function to map submission data to form fields
 function mapSubmissionToFormData(submission) {
   if (!submission || !submission.fields) {
@@ -334,121 +498,68 @@ function mapSubmissionToFormData(submission) {
   const fields = submission.fields;
   console.log('Mapping submission fields:', Object.keys(fields));
   
-  // Helper function to split phone numbers
-  function splitPhone(phone) {
-    // Remove all non-numeric characters
-    if (!phone) return { first: '', second: '', third: '' };
-    
-    const cleaned = phone.toString().replace(/\D/g, '');
-    return {
-      first: cleaned.substring(0, 3),
-      second: cleaned.substring(3, 6),
-      third: cleaned.substring(6, 10)
-    };
-  }
+  // Extract all dependents and store them in the global queue
+  dependentQueue = extractAllDependents(fields);
+  totalDependents = dependentQueue.length;
+  currentDependentIndex = 0;
   
-  // Helper function to split date (YYYY-MM-DD format)
-  function splitDate(date) {
-    if (!date) return { year: '', month: '', day: '' };
-    
-    // Handle multiple date formats
-    let parts;
-    if (typeof date === 'string' && date.includes('-')) {
-      parts = date.split('-');
-    } else if (typeof date === 'string' && date.includes('/')) {
-      parts = date.split('/');
-      // Adjust for MM/DD/YYYY format
-      if (parts.length === 3 && parts[2].length === 4) {
-        return {
-          year: parts[2],
-          month: parseInt(parts[0], 10).toString(), // Remove leading zero
-          day: parseInt(parts[1], 10).toString()    // Remove leading zero
-        };
-      }
-    } else {
-      console.warn('Unable to parse date:', date);
-      return { year: '', month: '', day: '' };
-    }
-    
-    // Standard YYYY-MM-DD format
-    if (parts && parts.length === 3) {
-      return {
-        year: parts[0],
-        month: parseInt(parts[1], 10).toString(), // Remove leading zero
-        day: parseInt(parts[2], 10).toString()    // Remove leading zero
-      };
-    }
-    
-    console.warn('Unexpected date format:', date);
-    return { year: '', month: '', day: '' };
-  }
-  
-  // Helper function to get the first non-empty value from multiple field names
-  function getFieldValue(possibleFieldNames, defaultValue = "") {
-    for (const fieldName of possibleFieldNames) {
-      const value = fields[fieldName];
-      if (value !== undefined && value !== null && value !== "") {
-        return value;
-      }
-    }
-    return defaultValue;
-  }
+  console.log(`Found ${totalDependents} dependents in submission:`, dependentQueue);
   
   // Get name fields with multiple possible field names
-  const firstName = getFieldValue([
+  const firstName = getFieldValue(fields, [
     "firstName", "firstname", "FirstName", "First Name", "first name", "first_name"
   ]);
   
-  const lastName = getFieldValue([
+  const lastName = getFieldValue(fields, [
     "lastName", "lastname", "LastName", "Last Name", "last name", "last_name"
   ]);
   
-  const middleName = getFieldValue([
+  const middleName = getFieldValue(fields, [
     "middleName", "middlename", "MiddleName", "Middle Name", "middle name", "middle_name"
   ]);
   
   // Get address fields
-  const address1 = getFieldValue([
+  const address1 = getFieldValue(fields, [
     "Address Line 1", "Address", "address", "address1", "addressLine1", "street"
   ]);
   
-  const address2 = getFieldValue([
+  const address2 = getFieldValue(fields, [
     "Address Line 2", "address2", "addressLine2", "apt", "suite", "unit"
   ]);
   
-  const city = getFieldValue([
+  const city = getFieldValue(fields, [
     "City", "city"
   ]);
   
-  const state = getFieldValue([
+  const state = getFieldValue(fields, [
     "State", "state"
   ]);
   
-  const zipcode = getFieldValue([
-    "Zip", "zip", "zipcode", "Zip Code", "zip code", "postal"
+  const zipcode = getFieldValue(fields, [
+    "Zip", "zip", "zipcode", "ZipCode", "Zipcode", "postal", "Postal"
   ]).toString().replace(/,/g, '');
   
-  // Get phone numbers
-  const cellPhone = splitPhone(getFieldValue([
-    "Cell Phone", "cellPhone", "cell", "phone", "Phone", "mobile", "Mobile Phone"
+  // Get phone fields
+  const cellPhone = splitPhone(getFieldValue(fields, [
+    "Cell Phone", "cellPhone", "cell phone", "cell", "Cell", "mobile", "Mobile"
   ]));
   
-  const workPhone = splitPhone(getFieldValue([
-    "Work Phone", "workPhone", "work", "office", "Office Phone", "business", "Business Phone", "alternatePhone"
+  const workPhone = splitPhone(getFieldValue(fields, [
+    "Work Phone", "workPhone", "work phone", "work", "Work", "office", "Office"
   ]));
   
   // Get email
-  const email = getFieldValue([
-    "email", "Email", "e-mail", "emailAddress", "Email Address"
+  const email = getFieldValue(fields, [
+    "email", "Email", "e-mail", "E-mail"
   ]);
   
   // Get SSN
-  const ssn = getFieldValue([
-    "SSN", "ssn", "Social Security", "social security number", "Social Security Number"
+  const ssn = getFieldValue(fields, [
+    "SSN", "ssn", "Social Security", "socialSecurity", "social security"
   ]);
   
   // Get DOB fields
-  const dobValue = getFieldValue([
+  const dobValue = getFieldValue(fields, [
     "DOB", "dob", "Date of Birth", "dateOfBirth", "birthDate", "Birth Date"
   ]);
   const dob = splitDate(dobValue);
@@ -456,7 +567,7 @@ function mapSubmissionToFormData(submission) {
   console.log('Parsed DOB values:', dob);
   
   // Get gender
-  const genderValue = getFieldValue([
+  const genderValue = getFieldValue(fields, [
     "Gender", "gender", "sex", "Sex"
   ]);
   
@@ -472,63 +583,144 @@ function mapSubmissionToFormData(submission) {
     (genderMap[genderValue.toString().toLowerCase()] || genderValue) : 'M';
   
   // Get agent
-  const agent = getFieldValue([
+  const agent = getFieldValue(fields, [
     "Agent", "agent", "Agent Name", "agent name", "AgentName"
   ]);
   
   // Get notes
-  const notes = getFieldValue([
+  const notes = getFieldValue(fields, [
     "Notes", "notes", "Comments", "comments", "Additional Notes", "additional notes"
   ]);
   
-  // Get dependent/beneficiary info
-  const dependentRelationship = getFieldValue([
-    "Dependent 2 Relationship", "dependent relationship", "beneficiary relationship"
+  // Get dependent info (first dependent)
+  const firstDependentFirstName = getFieldValue(fields, [
+    "Dependent First Name", "Dependent Firstname", "dependent first name", "dependent firstname"
   ]);
   
-  const dependentName = getFieldValue([
-    "Dependent 2 Name", "dependent name", "beneficiary name"
+  const firstDependentLastName = getFieldValue(fields, [
+    "Dependent Last Name", "Dependent Lastname", "dependent last name", "dependent lastname"
   ]);
   
-  const dependentDOB = splitDate(getFieldValue([
-    "Dependent 2 DOB", "dependent dob", "beneficiary dob"
-  ]));
+  // If we have a full name but not separate first/last name, try to split it
+  const firstDependentName = getFieldValue(fields, [
+    "Dependent Name", "dependent name"
+  ]);
+  
+  let dependentFirstName = firstDependentFirstName;
+  let dependentLastName = firstDependentLastName;
+  
+  // If we have a full name but not separate parts, try to split it
+  if (!dependentFirstName && firstDependentName) {
+    const parts = firstDependentName.split(' ');
+    if (parts.length > 1) {
+      dependentFirstName = parts[0];
+      dependentLastName = parts.slice(1).join(' ');
+    } else {
+      dependentFirstName = firstDependentName;
+    }
+  }
+  
+  let dependentRelationship = getFieldValue(fields, [
+    "Dependent Relationship", "dependent relationship"
+  ]);
+  
+  // Normalize relationship to match dropdown options exactly (Spouse or Child)
+  if (dependentRelationship && typeof dependentRelationship === 'string') {
+    dependentRelationship = dependentRelationship.toLowerCase();
+    if (dependentRelationship.includes('spouse') || dependentRelationship.includes('wife') || dependentRelationship.includes('husband')) {
+      dependentRelationship = 'Spouse';
+    } else if (dependentRelationship.includes('child') || dependentRelationship.includes('son') || dependentRelationship.includes('daughter')) {
+      dependentRelationship = 'Child';
+    } else {
+      // Default to Child if it's something else
+      dependentRelationship = 'Child';
+    }
+  } else {
+    // If no relationship is found, default to Child
+    dependentRelationship = 'Child';
+  }
+  
+  const dependentGender = getFieldValue(fields, [
+    "Dependent Gender", "dependent gender"
+  ]);
+  
+  // Convert gender to required format
+  const dependentGenderMapped = dependentGender ? 
+    (genderMap[dependentGender.toString().toLowerCase()] || dependentGender) : '';
+  
+  const dependentSSN = getFieldValue(fields, [
+    "Dependent SSN", "dependent ssn"
+  ]);
+  
+  const dependentDOBValue = getFieldValue(fields, [
+    "Dependent DOB", "dependent dob"
+  ]);
+  
+  const dependentDOB = splitDate(dependentDOBValue);
+  
+  // Get dependent address info - default to main applicant if not specified
+  const dependentAddress = getFieldValue(fields, [
+    "Dependent Address", "dependent address"
+  ]) || address1;
+  
+  const dependentCity = getFieldValue(fields, [
+    "Dependent City", "dependent city"
+  ]) || city;
+  
+  const dependentState = getFieldValue(fields, [
+    "Dependent State", "dependent state"
+  ]) || state;
+  
+  const dependentZip = getFieldValue(fields, [
+    "Dependent Zip", "dependent zip"
+  ]) || zipcode;
+  
+  const dependentPhone = splitPhone(getFieldValue(fields, [
+    "Dependent Phone", "dependent phone"
+  ])) || cellPhone;
+  
+  const dependentEmail = getFieldValue(fields, [
+    "Dependent Email", "dependent email"
+  ]) || email;
   
   // Get payment info
-  const cardNumber = getFieldValue([
+  const cardNumber = getFieldValue(fields, [
     "Card Number", "cardNumber", "card number", "CC Number", "cc number", "credit card"
   ]);
   
-  const expMonth = getFieldValue([
+  const expMonth = getFieldValue(fields, [
     "Exp. Month", "expMonth", "exp month", "cc exp month"
   ]);
   
-  const expYear = getFieldValue([
+  const expYear = getFieldValue(fields, [
     "Exp. Year", "expYear", "exp year", "cc exp year"
   ]);
   
-  const cvv = getFieldValue([
+  const cvv = getFieldValue(fields, [
     "CVV", "cvv", "security code", "Security Code", "cvc", "CVC"
   ]).toString();
   
-  const billingAddress = getFieldValue([
+  const billingAddress = getFieldValue(fields, [
     "Billing Address Line 1", "Billing Address", "billingAddress", "billing address"
   ]);
   
-  const billingCity = getFieldValue([
+  const billingCity = getFieldValue(fields, [
     "Billing City", "billingCity", "billing city"
   ]);
   
-  const billingState = getFieldValue([
+  const billingState = getFieldValue(fields, [
     "Billing State", "billingState", "billing state"
   ]);
   
-  const billingZip = getFieldValue([
+  const billingZip = getFieldValue(fields, [
     "Billing Zip", "billingZip", "billing zip", "billing zipcode"
   ]).toString().replace(/,/g, '');
   
-  // Create the data object with mapped fields
-  return {
+  // Include original fields object for reference if other fields are needed
+  const result = {
+    // Original fields object for reference
+    fields: fields,
+    
     // Member info
     firstname: firstName,
     middlename: middleName,
@@ -578,6 +770,24 @@ function mapSubmissionToFormData(submission) {
     ben_DOBDay: "",
     ben_DOBYear: "",
     
+    // Dependent info (for first dependent)
+    dep_firstname: dependentFirstName,
+    dep_lastname: dependentLastName,
+    dep_relationship: dependentRelationship,
+    dep_gender: dependentGenderMapped,
+    dep_ssn: dependentSSN,
+    dep_DOBMonth: dependentDOB.month,
+    dep_DOBDay: dependentDOB.day,
+    dep_DOBYear: dependentDOB.year,
+    dep_address: dependentAddress,
+    dep_city: dependentCity,
+    dep_state: dependentState,
+    dep_zipcode: dependentZip,
+    dep_phone1_1: dependentPhone.first,
+    dep_phone1_2: dependentPhone.second,
+    dep_phone1_3: dependentPhone.third,
+    dep_email: dependentEmail,
+    
     // Payment info - Credit Card
     cc_number: cardNumber,
     pay_ccexpmonth: expMonth,
@@ -596,27 +806,50 @@ function mapSubmissionToFormData(submission) {
     
     // Text/Email communication
     send_text: cellPhone.first + cellPhone.second + cellPhone.third,
-    send_email: email
+    send_email: email ? "Y" : "N"
   };
+  
+  console.log('Mapped form data with dependent information:', result);
+  return result;
 }
 
-// Function to fill form with a specific submission
+// Fill form with given submission data
 function fillFormWithSubmission(submission) {
-  console.log('Filling form with submission:', submission);
-  
-  if (!submission || !submission.fields) {
-    console.error('Invalid submission data');
+  if (!submission) {
+    console.error('Cannot fill form: No submission provided');
     return;
   }
   
-  // Map submission to form data
-  const formData = mapSubmissionToFormData(submission);
+  console.log('Filling form with submission data:', submission);
   
-  // Fill form with the mapped data
-  fillNonPaymentFields(formData);
-  handlePaymentFields(formData);
+  // Map submission to form data format
+  const testData = mapSubmissionToFormData(submission);
+  console.log('Mapped submission to form data:', testData);
   
-  console.log('Form has been filled with submission data!');
+  try {
+    // Fill non-payment fields (personal info, contact, etc.)
+    fillNonPaymentFields(testData);
+    
+    // Handle payment fields separately (credit card, etc.)
+    handlePaymentFields(testData);
+    
+    // Attempt to fill dependent form with first dependent data if we have dependents
+    if (dependentQueue.length > 0) {
+      setTimeout(() => {
+        fillDependentForm(testData);
+      }, 1000); // Wait a bit to ensure main form is filled before working on dependents
+      
+      console.log(`Queued ${dependentQueue.length} dependents for filling`);
+    } else {
+      console.log('No dependents found in the submission data');
+    }
+    
+    console.log('Form filled successfully');
+    return true;
+  } catch (error) {
+    console.error('Error filling form:', error);
+    return false;
+  }
 }
 
 // Fill non-payment fields with the provided data
@@ -963,4 +1196,154 @@ function createTestSubmission() {
       Agent: "Test Agent"
     }
   };
+}
+
+// Function to fill in the dependent form with data from a specific dependent
+function fillDependentForm(testData) {
+  console.log('Attempting to fill dependent form...');
+  
+  if (dependentQueue.length === 0) {
+    console.log('No dependents in queue, nothing to fill');
+    return;
+  }
+  
+  // Find the Save Dependent button
+  const saveButtons = document.querySelectorAll('input[value="Save Dependent"]');
+  if (saveButtons.length > 0) {
+    const originalButton = saveButtons[0];
+    const parentElement = originalButton.parentElement;
+    
+    // Check if we have a valid parent element
+    if (!parentElement) {
+      console.warn('Could not find parent element for Save Dependent button');
+      return;
+    }
+    
+    console.log(`Setting up for ${totalDependents} dependents. Currently on dependent #${currentDependentIndex + 1}`);
+    
+    // Don't modify the original save button text
+    // Instead, add a "Load Next Dependent" button if we have more dependents
+    if (totalDependents > 1 && currentDependentIndex < totalDependents - 1) {
+      // Check if the Load Next button already exists
+      const existingLoadButton = document.getElementById('load-next-dependent-btn');
+      if (!existingLoadButton) {
+        // Create a new "Load Next Dependent" button
+        const loadNextButton = document.createElement('input');
+        loadNextButton.type = 'button';
+        loadNextButton.value = `Load Next Dependent (${currentDependentIndex + 1}/${totalDependents})`;
+        loadNextButton.id = 'load-next-dependent-btn';
+        loadNextButton.style.marginLeft = '10px';
+        loadNextButton.setAttribute('aria-label', 'Load Next Dependent');
+        
+        // Add a click handler to load the next dependent
+        loadNextButton.addEventListener('click', function() {
+          // Increment to the next dependent
+          currentDependentIndex++;
+          if (currentDependentIndex < totalDependents) {
+            console.log(`Loading dependent #${currentDependentIndex + 1} of ${totalDependents}`);
+            fillDependentWithQueuedData();
+            // Update the button text after loading the next dependent
+            loadNextButton.value = `Load Next Dependent (${currentDependentIndex + 1}/${totalDependents})`;
+            // Hide the button if we're at the last dependent
+            if (currentDependentIndex >= totalDependents - 1) {
+              loadNextButton.style.display = 'none';
+              console.log('Last dependent loaded, hiding Load Next button');
+            }
+          }
+        });
+        
+        // Insert the new button after the save button
+        console.log('Adding Load Next Dependent button');
+        parentElement.appendChild(loadNextButton);
+      }
+    }
+  } else {
+    console.warn('Save Dependent button not found');
+  }
+  
+  // Fill the form with the current dependent's data
+  fillDependentWithQueuedData();
+}
+
+// Helper function to fill the dependent form with data from the queue
+function fillDependentWithQueuedData() {
+  if (currentDependentIndex >= dependentQueue.length) {
+    console.log('No more dependents in queue');
+    return;
+  }
+  
+  const dependent = dependentQueue[currentDependentIndex];
+  console.log(`Filling dependent form with dependent #${currentDependentIndex + 1}:`, dependent);
+  
+  // Clear all form fields first
+  const fieldsToClear = ['dep_firstname', 'dep_lastname', 'dep_relationship', 'dep_gender', 
+                        'dep_DOBMonth', 'dep_DOBDay', 'dep_DOBYear', 'dep_ssn', 
+                        'dep_address', 'dep_city', 'dep_state', 'dep_zipcode',
+                        'dep_phone1_1', 'dep_phone1_2', 'dep_phone1_3', 'dep_email'];
+  
+  fieldsToClear.forEach(fieldName => {
+    const elements = document.getElementsByName(fieldName);
+    if (elements.length > 0) {
+      const element = elements[0];
+      if (element.tagName === 'SELECT') {
+        element.selectedIndex = 0;
+      } else {
+        element.value = '';
+      }
+    }
+  });
+  
+  // Map the fields
+  const fieldMappings = [
+    { name: 'dep_firstname', value: dependent.firstName },
+    { name: 'dep_lastname', value: dependent.lastName },
+    { name: 'dep_relationship', value: dependent.relationship },
+    { name: 'dep_gender', value: dependent.gender },
+    { name: 'dep_DOBMonth', value: dependent.dobMonth },
+    { name: 'dep_DOBDay', value: dependent.dobDay },
+    { name: 'dep_DOBYear', value: dependent.dobYear },
+    { name: 'dep_ssn', value: dependent.ssn }
+  ];
+  
+  // Fill each field
+  fieldMappings.forEach(mapping => {
+    if (mapping.value) {
+      const elements = document.getElementsByName(mapping.name);
+      if (elements.length > 0) {
+        const element = elements[0];
+        element.value = mapping.value;
+        
+        // Dispatch the appropriate event
+        if (element.tagName === 'SELECT') {
+          element.dispatchEvent(new Event('change', { bubbles: true }));
+          
+          // For relationship dropdown, make sure it's selected properly
+          if (mapping.name === 'dep_relationship') {
+            setTimeout(() => {
+              for (let i = 0; i < element.options.length; i++) {
+                if (element.options[i].value === mapping.value) {
+                  element.selectedIndex = i;
+                  element.dispatchEvent(new Event('change', { bubbles: true }));
+                  console.log(`Set ${mapping.name} to "${mapping.value}" using selectedIndex`);
+                  break;
+                }
+              }
+            }, 100);
+          }
+        } else {
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    }
+  });
+  
+  // Update the "Load Next Dependent" button text
+  const loadNextButton = document.getElementById('load-next-dependent-btn');
+  if (loadNextButton) {
+    loadNextButton.value = `Load Next Dependent (${currentDependentIndex + 1}/${totalDependents})`;
+    // Hide the button if we're at the last dependent
+    if (currentDependentIndex >= totalDependents - 1) {
+      loadNextButton.style.display = 'none';
+    }
+  }
 } 
