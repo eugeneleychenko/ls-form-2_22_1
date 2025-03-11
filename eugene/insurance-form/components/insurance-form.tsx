@@ -16,11 +16,13 @@ import AgentInformation from "./form-sections/agent-information"
 import { submitToAirtable } from "@/lib/airtable"
 import { toast } from "sonner"
 import { FormData } from "@/types/form"
+import { useDebug } from "@/hooks/DebugContext"
 
 export default function InsuranceForm() {
   const [activeSection, setActiveSection] = useState("basicInformation")
   const methods = useForm<FormData>()
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const { isDebugMode, toggleDebugMode } = useDebug()
 
   const handleSubmit = async (data: FormData) => {
     const { leadId, firstName, lastName } = data.basicInformation || {}
@@ -290,12 +292,18 @@ export default function InsuranceForm() {
             {/* Mobile View - Dropdown */}
             <div className="md:hidden w-full">
               <Select value={activeSection} onValueChange={scrollToSection}>
-                <SelectTrigger className="w-full">
-                  <SelectValue>{sections.find(s => s.id === activeSection)?.label || "Select Section"}</SelectValue>
+                <SelectTrigger>
+                  <SelectValue>{sections.find(s => s.id === activeSection)?.label || "Select Section"}
+                    {activeSection === "basicInformation" && isDebugMode && <span className="ml-2 text-xs">🔍</span>}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {sections.map((section) => (
-                    <SelectItem key={section.id} value={section.id}>
+                    <SelectItem 
+                      key={section.id} 
+                      value={section.id}
+                      onDoubleClick={section.id === "basicInformation" ? toggleDebugMode : undefined}
+                    >
                       {section.label}
                     </SelectItem>
                   ))}
@@ -306,18 +314,18 @@ export default function InsuranceForm() {
             {/* Desktop View - Horizontal Menu */}
             <div className="hidden md:flex space-x-4 overflow-x-auto">
               {sections.map((section) => (
-                <button
+                <div
                   key={section.id}
-                  type="button"
+                  className={`px-4 py-2 rounded-md cursor-pointer ${
+                    activeSection === section.id ? "bg-primary text-white" : "bg-gray-100 hover:bg-gray-200"
+                  } ${section.id === "basicInformation" && isDebugMode ? "ring-2 ring-amber-400" : ""}`}
                   onClick={() => scrollToSection(section.id)}
-                  className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors
-                    ${activeSection === section.id 
-                      ? 'bg-primary text-white font-bold' 
-                      : 'text-gray-700 hover:bg-gray-100'
-                    }`}
+                  onDoubleClick={section.id === "basicInformation" ? toggleDebugMode : undefined}
+                  title={section.id === "basicInformation" ? "Double-click to toggle debug mode" : undefined}
                 >
                   {section.label}
-                </button>
+                  {section.id === "basicInformation" && isDebugMode && <span className="ml-2 text-xs">🔍</span>}
+                </div>
               ))}
             </div>
           </div>
@@ -352,7 +360,8 @@ export default function InsuranceForm() {
               <Button 
                 type="button" 
                 onClick={fillTestData}
-                className="bg-gray-600 hover:bg-gray-700 px-6 py-2"
+                data-debug-button
+                className={`bg-gray-600 hover:bg-gray-700 px-6 py-2 ${!isDebugMode ? 'hidden' : ''}`}
               >
                 Fill Test Data
               </Button>
@@ -360,7 +369,8 @@ export default function InsuranceForm() {
               <Button 
                 type="button" 
                 onClick={inspectFormData}
-                className="bg-blue-600 hover:bg-blue-700 px-6 py-2"
+                data-debug-button
+                className={`bg-blue-600 hover:bg-blue-700 px-6 py-2 ${!isDebugMode ? 'hidden' : ''}`}
               >
                 Inspect Data
               </Button>

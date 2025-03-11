@@ -4,7 +4,7 @@
 ##[✅] Only fetch from airtable when clicking on 'Refresh Submissions'. Right now we have console logs of what is currerntly cached everytime i visit any page. dont do that. only show the logs when clicking on that button.
 ##[✅] when searching for the name in the search bar include the created date in (). So let's say the results will be "Brown, Bill", it'll look like "Brown, Bill (3/11)"
 
-##[] Add dependents
+##[✅] Add dependents
 
 you can only add one dependent at a time. So once you add the first one, you click on 'Save Dependant', which will save and blank the fields so the next one can be input.
 
