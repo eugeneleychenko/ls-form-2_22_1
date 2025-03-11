@@ -806,7 +806,7 @@ function mapSubmissionToFormData(submission) {
     
     // Text/Email communication
     send_text: cellPhone.first + cellPhone.second + cellPhone.third,
-    send_email: email ? "Y" : "N"
+    send_email: email
   };
   
   console.log('Mapped form data with dependent information:', result);
