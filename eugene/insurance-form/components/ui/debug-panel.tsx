@@ -367,7 +367,40 @@ export function DebugPanel() {
     let premiumTotal = 0;
     let commissionTotal = 0;
     
-    // American Financial add-ons
+    // First check if we have direct values in addonsCost field
+    if (insuranceDetails?.addonsCost && hasValue(insuranceDetails.addonsCost)) {
+      // Use the total addons cost field directly if it exists
+      const addonsCostClean = insuranceDetails.addonsCost.replace(/[$,]/g, '');
+      const addonsCostValue = parseFloat(addonsCostClean);
+      
+      if (!isNaN(addonsCostValue)) {
+        premiumTotal += addonsCostValue;
+        
+        // Look for a special commissions field for addons if it exists
+        // This is based on what's in the raw values section as "addonsCosmmission: "$93.00""
+        const rawAddonsCommission = (insuranceDetails as any).addonsCommission;
+        
+        if (rawAddonsCommission && hasValue(rawAddonsCommission)) {
+          const commissionClean = rawAddonsCommission.replace(/[$,]/g, '');
+          const commissionValue = parseFloat(commissionClean);
+          
+          if (!isNaN(commissionValue)) {
+            commissionTotal += commissionValue;
+          }
+        } else {
+          // Default to 100% commission if not specified
+          commissionTotal += addonsCostValue;
+        }
+        
+        // If we have direct values, return them immediately
+        return {
+          premium: `$${premiumTotal.toFixed(2)}`,
+          commission: `$${commissionTotal.toFixed(2)}`
+        };
+      }
+    }
+    
+    // If no direct values, check individual American Financial add-ons
     for (let i = 1; i <= 3; i++) {
       const planKey = `americanFinancial${i}Plan` as keyof typeof insuranceDetails;
       const premiumKey = `americanFinancial${i}Premium` as keyof typeof insuranceDetails;

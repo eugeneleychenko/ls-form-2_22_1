@@ -52,6 +52,7 @@ export interface FormData {
     hasAddons?: boolean;
     selectedAddons?: string[];
     addonsCost?: string;
+    addonsCommission?: string;
   };
   personalDetails?: {
     ssn?: string;

@@ -1108,10 +1108,18 @@ export default function InsuranceDetails() {
     setAddonCostBreakdown(costBreakdown);
     setAddonCommissionBreakdown(commissionBreakdown);
     
+    // Format the result values
+    const formattedTotalCost = `$${totalCost.toFixed(2)}`;
+    const formattedTotalCommission = `$${totalCommission.toFixed(2)}`;
+    
+    // Update the form fields with the calculated values
+    setValue("insuranceDetails.addonsCost", formattedTotalCost);
+    setValue("insuranceDetails.addonsCommission", formattedTotalCommission);
+    
     // Create return values
     const result = { 
-      totalCost: `$${totalCost.toFixed(2)}`,
-      totalCommission: `$${totalCommission.toFixed(2)}` // [X] Return commission total
+      totalCost: formattedTotalCost,
+      totalCommission: formattedTotalCommission
     };
     
     // Update premiums to reflect add-on changes
