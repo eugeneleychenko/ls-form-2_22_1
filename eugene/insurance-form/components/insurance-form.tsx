@@ -13,6 +13,7 @@ import AddressInformation from "./form-sections/address-information"
 import DependentsInformation from "./form-sections/dependents-information"
 import BillingInformation from "./form-sections/billing-information"
 import AgentInformation from "./form-sections/agent-information"
+import { DebugPanel } from "./ui/debug-panel"
 import { submitToAirtable } from "@/lib/airtable"
 import { toast } from "sonner"
 import { FormData } from "@/types/form"
@@ -399,6 +400,9 @@ export default function InsuranceForm() {
             </svg>
           </button>
         )}
+        
+        {/* Debug Panel - Shows calculations in debug mode */}
+        <DebugPanel />
       </form>
     </FormProvider>
   )

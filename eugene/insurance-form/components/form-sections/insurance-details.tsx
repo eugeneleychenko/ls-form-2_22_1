@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from "react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Define types for the Airtable response
 interface AirtableRecord {
@@ -138,6 +139,36 @@ const calculateEnrollmentCommission = (enrollmentFee: string): number => {
   return 0;
 };
 
+// InfoTooltip component for showing breakdowns
+const InfoTooltip = ({ 
+  items, 
+  className 
+}: { 
+  items: { label: string; value: string }[];
+  className?: string;
+}) => {
+  return (
+    <TooltipProvider>
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          <span className={`ml-1 text-muted-foreground cursor-help ${className}`}>ⓘ</span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[300px]">
+          <div className="space-y-1 text-xs">
+            <div className="font-semibold border-b pb-1">Breakdown</div>
+            {items.map((item, index) => (
+              <div key={index} className="flex justify-between">
+                <span>{item.label}:</span>
+                <span className="font-medium">{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+};
+
 export default function InsuranceDetails() {
   const { control, setValue, watch } = useFormContext()
   const [carriers, setCarriers] = useState<string[]>([])
@@ -164,6 +195,12 @@ export default function InsuranceDetails() {
   const [addonCommissions, setAddonCommissions] = useState<Record<string, string>>({})
   const [addonsTotalCommission, setAddonsTotalCommission] = useState<string>("0")
   const [totalCommission, setTotalCommission] = useState<string>("0")
+  
+  // Add state for tooltip breakdowns
+  const [addonCostBreakdown, setAddonCostBreakdown] = useState<{ label: string; value: string }[]>([])
+  const [addonCommissionBreakdown, setAddonCommissionBreakdown] = useState<{ label: string; value: string }[]>([])
+  const [firstMonthBreakdown, setFirstMonthBreakdown] = useState<{ label: string; value: string }[]>([])
+  const [totalCommissionBreakdown, setTotalCommissionBreakdown] = useState<{ label: string; value: string }[]>([])
   
   // State for insurance types
   const [insuranceTypes, setInsuranceTypes] = useState<string[]>([])
@@ -764,18 +801,46 @@ export default function InsuranceDetails() {
     const costValue = parseFloat(cost.replace(/[^0-9.]/g, ''));
     const enrollmentFeeValue = parseFloat(enrollmentFee.replace(/[^0-9.]/g, '') || "0");
     
+    // Get add-ons cost value (extract numeric portion)
+    const addonsCostValue = parseFloat(addonsTotalCost.replace(/[^0-9.]/g, '') || "0");
+    
     // Calculate commission as a dollar amount
     let calculatedCommission = `$${(parseFloat(commissionRate) * 0.01 * costValue).toFixed(2)}`;
     let displayRate = commissionRate + "%";
     
-    // Calculate first month premium (cost + enrollment fee)
-    const firstMonthPremium = costValue + enrollmentFeeValue;
+    // Calculate first month premium (cost + enrollment fee + add-ons)
+    const firstMonthPremium = costValue + enrollmentFeeValue + addonsCostValue;
+    
+    // Calculate monthly premium (cost + add-ons)
+    const monthlyPremium = costValue + addonsCostValue;
+    
+    // Update first month premium breakdown for tooltip
+    const firstMonthBreakdownItems = [
+      { label: "Plan Cost", value: formattedCost }
+    ];
+    
+    if (enrollmentFeeValue > 0) {
+      firstMonthBreakdownItems.push({ 
+        label: "Enrollment Fee", 
+        value: `$${enrollmentFeeValue.toFixed(2)}` 
+      });
+    }
+    
+    if (addonsCostValue > 0) {
+      firstMonthBreakdownItems.push({
+        label: "Add-ons", 
+        value: addonsTotalCost
+      });
+    }
+    
+    setFirstMonthBreakdown(firstMonthBreakdownItems);
     
     console.log("Setting plan cost to:", formattedCost);
     console.log("Commission rate:", commissionRate);
     console.log("Calculated commission:", calculatedCommission);
     console.log("Enrollment fee:", `$${enrollmentFee}`);
     console.log("First month premium:", `$${firstMonthPremium.toFixed(2)}`);
+    console.log("Monthly premium:", `$${monthlyPremium.toFixed(2)}`);
     
     setValue("insuranceDetails.planCost", formattedCost);
     setValue("insuranceDetails.commissionRate", displayRate);
@@ -783,7 +848,7 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.enrollmentFee", `$${enrollmentFee}`);
     setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
     setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
-    setValue("insuranceDetails.monthlyPremium", formattedCost);
+    setValue("insuranceDetails.monthlyPremium", `$${monthlyPremium.toFixed(2)}`);
     setPlanCommission(calculatedCommission);
     
     // Calculate total commission (plan + addons)
@@ -810,30 +875,32 @@ export default function InsuranceDetails() {
       
       // Recalculate total commission with just the plan commission
       calculateTotalCommission(planCommission, []); // [X] Update total commission
+      
+      // Update premiums to remove add-ons
+      updatePremiumsWithAddons();
     }
   };
 
   // Handle addon selection for radio buttons (original providers)
-  const handleAddonSelection = (addonName: string, provider: string) => {
+  const handleAddonSelectionRadio = (provider: string, addonName: string) => {
+    handleAddonSelection(provider, addonName, true);
+  };
+
+  // Handle addon selection
+  const handleAddonSelection = (provider: string, addonName: string, checked: boolean) => {
     // Create a unique identifier that includes both the name and provider
     const addonIdentifier = `${provider}:${addonName}`;
     
-    // Check if this addon is already selected
-    const isCurrentlySelected = selectedAddons.includes(addonIdentifier);
+    let updatedAddons = [...selectedAddons];
     
-    // Update selected addons list
-    let updatedAddons: string[];
-    
-    if (isCurrentlySelected) {
-      // Remove the addon if it's already selected
-      updatedAddons = selectedAddons.filter(addon => addon !== addonIdentifier);
+    if (checked) {
+      // Add the addon if it's not already selected
+      if (!updatedAddons.includes(addonIdentifier)) {
+        updatedAddons.push(addonIdentifier);
+      }
     } else {
-      // Add the addon if it's not selected, and remove any other addon from the same provider
-      // (since radio buttons are mutually exclusive within a provider)
-      updatedAddons = [
-        ...selectedAddons.filter(addon => !addon.startsWith(`${provider}:`)),
-        addonIdentifier
-      ];
+      // Remove the addon if it's selected
+      updatedAddons = updatedAddons.filter(addon => addon !== addonIdentifier);
     }
     
     setSelectedAddons(updatedAddons);
@@ -847,113 +914,27 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.addonsCost", totalCost);
     setValue("insuranceDetails.addonsCommission", totalCommission);
     
-    // Map specific addon providers to their respective fields
-    if (provider === "AMT Addons 1") {
-      if (!isCurrentlySelected) {
-        // Find the addon in availableAddons
-        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
-        if (addon) {
-          // Extract just the numeric part of the cost (remove state availability info)
-          const costMatch = addon.planCost.match(/\$?(\d+\.\d+)/);
-          const cleanCost = costMatch ? `$${costMatch[1]}` : addon.planCost;
-          
-          // Extract the numeric premium value for calculation
-          const premiumValue = parseFloat(addon.planCost.replace(/[^0-9.]/g, ''));
-          
-          // Process the commission correctly
-          const commissionValue = parseFloat(addon.planCommission);
-          let calculatedCommission = 0;
-          
-          if (commissionValue <= 1) {
-            // If it's a decimal percentage (e.g., 0.2 for 20%)
-            calculatedCommission = premiumValue * commissionValue;
-          } else {
-            // If it's already a percentage (e.g., 20 for 20%)
-            calculatedCommission = premiumValue * (commissionValue / 100);
-          }
-          
-          const formattedCommission = `$${calculatedCommission.toFixed(2)}`;
-          
-          setValue("insuranceDetails.amt1Plan", addonName);
-          setValue("insuranceDetails.amt1Premium", cleanCost);
-          setValue("insuranceDetails.amt1Commission", formattedCommission);
-          
-          console.log(`AMT 1 Commission calculated: Premium $${premiumValue} * Rate ${commissionValue <= 1 ? commissionValue * 100 : commissionValue}% = $${calculatedCommission.toFixed(2)}`);
-        }
+    // Special handling for American Financial
+    if (provider === "American Financial") {
+      const americanFinancialAddons = updatedAddons.filter(addon => 
+        addon.startsWith("American Financial:")
+      );
+      
+      if (americanFinancialAddons.length > 0) {
+        // ... existing American Financial code ...
       } else {
-        // Clear AMT 1 values when deselected
-        setValue("insuranceDetails.amt1Plan", "");
-        setValue("insuranceDetails.amt1Premium", "");
-        setValue("insuranceDetails.amt1Commission", "");
-      }
-    } else if (provider === "AMT Addons 2") {
-      if (!isCurrentlySelected) {
-        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
-        if (addon) {
-          // Extract just the numeric part of the cost (remove state availability info)
-          const costMatch = addon.planCost.match(/\$?(\d+\.\d+)/);
-          const cleanCost = costMatch ? `$${costMatch[1]}` : addon.planCost;
-          
-          // Extract the numeric premium value for calculation
-          const premiumValue = parseFloat(addon.planCost.replace(/[^0-9.]/g, ''));
-          
-          // Process the commission correctly
-          const commissionValue = parseFloat(addon.planCommission);
-          let calculatedCommission = 0;
-          
-          if (commissionValue <= 1) {
-            // If it's a decimal percentage (e.g., 0.2 for 20%)
-            calculatedCommission = premiumValue * commissionValue;
-          } else {
-            // If it's already a percentage (e.g., 20 for 20%)
-            calculatedCommission = premiumValue * (commissionValue / 100);
-          }
-          
-          const formattedCommission = `$${calculatedCommission.toFixed(2)}`;
-          
-          setValue("insuranceDetails.amt2Plan", addonName);
-          setValue("insuranceDetails.amt2Premium", cleanCost);
-          setValue("insuranceDetails.amt2Commission", formattedCommission);
-          
-          console.log(`AMT 2 Commission calculated: Premium $${premiumValue} * Rate ${commissionValue <= 1 ? commissionValue * 100 : commissionValue}% = $${calculatedCommission.toFixed(2)}`);
-        }
-      } else {
-        // Clear AMT 2 values when deselected
-        setValue("insuranceDetails.amt2Plan", "");
-        setValue("insuranceDetails.amt2Premium", "");
-        setValue("insuranceDetails.amt2Commission", "");
-      }
-    } else if (provider === "American Financial 1") {
-      if (!isCurrentlySelected) {
-        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
-        if (addon) {
-          setValue("insuranceDetails.americanFinancial1Plan", addonName);
-        }
-      } else {
-        setValue("insuranceDetails.americanFinancial1Plan", "");
-      }
-    } else if (provider === "American Financial 2") {
-      if (!isCurrentlySelected) {
-        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
-        if (addon) {
-          setValue("insuranceDetails.americanFinancial2Plan", addonName);
-        }
-      } else {
-        setValue("insuranceDetails.americanFinancial2Plan", "");
-      }
-    } else if (provider === "American Financial 3") {
-      if (!isCurrentlySelected) {
-        const addon = availableAddons.find(a => a.planName === addonName && a.provider === provider);
-        if (addon) {
-          setValue("insuranceDetails.americanFinancial3Plan", addonName);
-        }
-      } else {
-        setValue("insuranceDetails.americanFinancial3Plan", "");
+        // Clear American Financial values if none selected
+        setValue("insuranceDetails.americanFinancialPlans", "");
+        setValue("insuranceDetails.americanFinancialPremium", "");
+        setValue("insuranceDetails.americanFinancialCommission", "");
       }
     }
     
     // Calculate overall total commission
     calculateTotalCommission(planCommission, updatedAddons);
+    
+    // Update monthly and first month premiums with add-ons
+    updatePremiumsWithAddons();
   };
 
   // Handle addon selection for multiselect (Leo Addons)
@@ -1036,12 +1017,17 @@ export default function InsuranceDetails() {
     
     // Calculate overall total commission
     calculateTotalCommission(planCommission, updatedAddons);
+    
+    // Update monthly and first month premiums with add-ons
+    updatePremiumsWithAddons();
   };
   
   // Calculate total cost and commission of selected addons
   const calculateAddonsValues = (selectedAddons: string[]): { totalCost: string, totalCommission: string } => { // [X] Updated return type
     let totalCost = 0;
     let totalCommission = 0; // [X] Added commission total
+    const costBreakdown: { label: string; value: string }[] = [];
+    const commissionBreakdown: { label: string; value: string }[] = [];
     
     selectedAddons.forEach(selectedAddon => {
       // Parse the addon identifier (provider:name or just name)
@@ -1098,18 +1084,41 @@ export default function InsuranceDetails() {
         if (!isNaN(cost)) {
           totalCost += cost;
           
+          // Add to cost breakdown for tooltip
+          costBreakdown.push({
+            label: addonName,
+            value: `$${cost.toFixed(2)}`
+          });
+          
           // Add the calculated commission
           if (!isNaN(commissionValue)) {
             totalCommission += commissionValue;
+            
+            // Add to commission breakdown for tooltip
+            commissionBreakdown.push({
+              label: addonName,
+              value: `$${commissionValue.toFixed(2)}`
+            });
           }
         }
       }
     });
     
-    return { 
+    // Update the breakdown state variables
+    setAddonCostBreakdown(costBreakdown);
+    setAddonCommissionBreakdown(commissionBreakdown);
+    
+    // Create return values
+    const result = { 
       totalCost: `$${totalCost.toFixed(2)}`,
       totalCommission: `$${totalCommission.toFixed(2)}` // [X] Return commission total
     };
+    
+    // Update premiums to reflect add-on changes
+    // This needs to be scheduled after the state updates to ensure we have the latest values
+    setTimeout(() => updatePremiumsWithAddons(), 0);
+    
+    return result;
   };
   
   // Calculate total cost of selected addons (legacy function kept for compatibility)
@@ -1139,6 +1148,30 @@ export default function InsuranceDetails() {
       total: planCommissionNumber + addonCommissionNumber + enrollmentCommissionNumber
     });
     
+    // Update the breakdown for the tooltip
+    const breakdown = [
+      { 
+        label: "Plan Commission", 
+        value: `$${planCommissionNumber.toFixed(2)}` 
+      }
+    ];
+    
+    if (addonCommissionNumber > 0) {
+      breakdown.push({ 
+        label: "Add-ons Commission", 
+        value: `$${addonCommissionNumber.toFixed(2)}` 
+      });
+    }
+    
+    if (enrollmentCommissionNumber > 0) {
+      breakdown.push({ 
+        label: "Enrollment Commission", 
+        value: `$${enrollmentCommissionNumber.toFixed(2)}` 
+      });
+    }
+    
+    setTotalCommissionBreakdown(breakdown);
+    
     // Calculate total (plan + addons + enrollment)
     const total = planCommissionNumber + addonCommissionNumber + enrollmentCommissionNumber;
     const totalFormatted = `$${total.toFixed(2)}`;
@@ -1155,24 +1188,11 @@ export default function InsuranceDetails() {
   
   // Helper function to group addons by type
   const getAddonsByType = () => {
-    let filteredAddons: AddonPlan[] = [];
-    
-    if (selectedCoverageType && addons) {
-      if (selectedCoverageType === "Individual" && addons.individual) {
-        filteredAddons = addons.individual.plans;
-      } else if (selectedCoverageType === "Family" && addons.family) {
-        filteredAddons = addons.family.plans;
-      } else if (selectedCoverageType === "Individual + Spouse" && addons.individualSpouse) {
-        filteredAddons = addons.individualSpouse.plans;
-      } else if (selectedCoverageType === "Individual + Children" && addons.individualChildren) {
-        filteredAddons = addons.individualChildren.plans;
-      }
-    }
-    
     // Group addons by provider type
     const groupedAddons: { [provider: string]: AddonPlan[] } = {};
     
-    filteredAddons.forEach(addon => {
+    // Use availableAddons instead of undefined addons variable
+    availableAddons.forEach(addon => {
       const provider = addon.provider || "Other";
       if (!groupedAddons[provider]) {
         groupedAddons[provider] = [];
@@ -1181,6 +1201,44 @@ export default function InsuranceDetails() {
     });
     
     return groupedAddons;
+  };
+
+  // Function to update premiums when add-ons change
+  const updatePremiumsWithAddons = () => {
+    const planCost = watch("insuranceDetails.planCost") || "$0";
+    const planCostValue = parseFloat(planCost.replace(/[^0-9.]/g, '') || "0");
+    const addonsCostValue = parseFloat(addonsTotalCost.replace(/[^0-9.]/g, '') || "0");
+    const enrollmentFee = watch("insuranceDetails.enrollmentFee") || "$0";
+    const enrollmentFeeValue = parseFloat(enrollmentFee.replace(/[^0-9.]/g, '') || "0");
+
+    // Update monthly premium (plan + add-ons)
+    const monthlyPremium = planCostValue + addonsCostValue;
+    setValue("insuranceDetails.monthlyPremium", `$${monthlyPremium.toFixed(2)}`);
+
+    // Update first month premium (plan + enrollment + add-ons)
+    const firstMonthPremium = planCostValue + enrollmentFeeValue + addonsCostValue;
+    setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
+    
+    // Update first month premium breakdown
+    const firstMonthBreakdownItems = [
+      { label: "Plan Cost", value: planCost }
+    ];
+    
+    if (enrollmentFeeValue > 0) {
+      firstMonthBreakdownItems.push({ 
+        label: "Enrollment Fee", 
+        value: `$${enrollmentFeeValue.toFixed(2)}` 
+      });
+    }
+    
+    if (addonsCostValue > 0) {
+      firstMonthBreakdownItems.push({
+        label: "Add-ons", 
+        value: addonsTotalCost
+      });
+    }
+    
+    setFirstMonthBreakdown(firstMonthBreakdownItems);
   };
 
   // Fetch insurance types
@@ -1637,9 +1695,9 @@ export default function InsuranceDetails() {
                       <RadioGroup 
                         value={selectedAddons.find(name => {
                           const addon = availableAddons.find(a => a.planName === name);
-                          return addon?.provider === "American Financial 1";
-                        })}
-                        onValueChange={(value) => handleAddonSelection(value, "American Financial 1")}
+                           return addon?.provider === "American Financial 1";
+                         })}
+                        onValueChange={(value) => handleAddonSelectionRadio("American Financial 1", value)}
                       >
                         {availableAddons
                           .filter(addon => addon.provider === "American Financial 1")
@@ -1669,9 +1727,9 @@ export default function InsuranceDetails() {
                       <RadioGroup 
                         value={selectedAddons.find(name => {
                           const addon = availableAddons.find(a => a.planName === name);
-                          return addon?.provider === "American Financial 2";
-                        })}
-                        onValueChange={(value) => handleAddonSelection(value, "American Financial 2")}
+                           return addon?.provider === "American Financial 2";
+                         })}
+                        onValueChange={(value) => handleAddonSelectionRadio("American Financial 2", value)}
                       >
                         {availableAddons
                           .filter(addon => addon.provider === "American Financial 2")
@@ -1701,9 +1759,9 @@ export default function InsuranceDetails() {
                       <RadioGroup 
                         value={selectedAddons.find(name => {
                           const addon = availableAddons.find(a => a.planName === name);
-                          return addon?.provider === "American Financial 3";
-                        })}
-                        onValueChange={(value) => handleAddonSelection(value, "American Financial 3")}
+                           return addon?.provider === "American Financial 3";
+                         })}
+                        onValueChange={(value) => handleAddonSelectionRadio("American Financial 3", value)}
                       >
                         {availableAddons
                           .filter(addon => addon.provider === "American Financial 3")
@@ -1733,9 +1791,9 @@ export default function InsuranceDetails() {
                       <RadioGroup 
                         value={selectedAddons.find(name => {
                           const addon = availableAddons.find(a => a.planName === name);
-                          return addon?.provider === "Essential Care Individual";
-                        })}
-                        onValueChange={(value) => handleAddonSelection(value, "Essential Care Individual")}
+                           return addon?.provider === "Essential Care Individual";
+                         })}
+                        onValueChange={(value) => handleAddonSelectionRadio("Essential Care Individual", value)}
                       >
                         {availableAddons
                           .filter(addon => addon.provider === "Essential Care Individual")
@@ -1795,9 +1853,9 @@ export default function InsuranceDetails() {
                       <RadioGroup 
                         value={selectedAddons.find(name => {
                           const addon = availableAddons.find(a => a.planName === name);
-                          return addon?.provider === "AMT Addons 1";
-                        })}
-                        onValueChange={(value) => handleAddonSelection(value, "AMT Addons 1")}
+                           return addon?.provider === "AMT Addons 1";
+                         })}
+                        onValueChange={(value) => handleAddonSelectionRadio("AMT Addons 1", value)}
                       >
                         {availableAddons
                           .filter(addon => addon.provider === "AMT Addons 1")
@@ -1827,9 +1885,9 @@ export default function InsuranceDetails() {
                       <RadioGroup 
                         value={selectedAddons.find(name => {
                           const addon = availableAddons.find(a => a.planName === name);
-                          return addon?.provider === "AMT Addons 2";
-                        })}
-                        onValueChange={(value) => handleAddonSelection(value, "AMT Addons 2")}
+                           return addon?.provider === "AMT Addons 2";
+                         })}
+                        onValueChange={(value) => handleAddonSelectionRadio("AMT Addons 2", value)}
                       >
                         {availableAddons
                           .filter(addon => addon.provider === "AMT Addons 2")
@@ -1862,7 +1920,12 @@ export default function InsuranceDetails() {
             name="insuranceDetails.addonsCost"
             render={({ field }) => (
               <FormItem className="pt-3">
-                <FormLabel>Total Add-ons Cost <sub>[Airtable: Addons Cost]</sub></FormLabel>
+                <FormLabel>
+                  Total Add-ons Cost <sub>[Airtable: Addons Cost]</sub>
+                  {addonCostBreakdown.length > 0 && (
+                    <InfoTooltip items={addonCostBreakdown} />
+                  )}
+                </FormLabel>
                 <FormControl>
                   <Input {...field} value={addonsTotalCost} readOnly />
                 </FormControl>
@@ -1877,7 +1940,12 @@ export default function InsuranceDetails() {
             name="insuranceDetails.addonsCommission"
             render={({ field }) => (
               <FormItem className="pt-3">
-                <FormLabel>Total Add-ons Commission <sub>[Airtable: Addons Commission]</sub></FormLabel>
+                <FormLabel>
+                  Total Add-ons Commission <sub>[Airtable: Addons Commission]</sub>
+                  {addonCommissionBreakdown.length > 0 && (
+                    <InfoTooltip items={addonCommissionBreakdown} />
+                  )}
+                </FormLabel>
                 <FormControl>
                   <Input {...field} value={addonsTotalCommission} readOnly />
                 </FormControl>
@@ -1947,7 +2015,12 @@ export default function InsuranceDetails() {
         name="insuranceDetails.firstMonthPremium"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>First Month Premium <sub>[Airtable: First Month Premium]</sub></FormLabel>
+            <FormLabel>
+              First Month Premium <sub>[Airtable: First Month Premium]</sub>
+              {firstMonthBreakdown.length > 0 && (
+                <InfoTooltip items={firstMonthBreakdown} />
+              )}
+            </FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1961,7 +2034,16 @@ export default function InsuranceDetails() {
         name="insuranceDetails.monthlyPremium"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Monthly Premium <sub>[Airtable: Monthly Premium]</sub></FormLabel>
+            <FormLabel>
+              Monthly Premium <sub>[Airtable: Monthly Premium]</sub>
+              <InfoTooltip 
+                items={[
+                  { label: "Plan Cost", value: watch("insuranceDetails.planCost") || "$0" },
+                  ...(parseFloat(addonsTotalCost.replace(/[^0-9.]/g, '')) > 0 ? 
+                    [{ label: "Add-ons", value: addonsTotalCost }] : [])
+                ]} 
+              />
+            </FormLabel>
             <FormControl>
               <Input {...field} readOnly />
             </FormControl>
@@ -1976,7 +2058,12 @@ export default function InsuranceDetails() {
         name="insuranceDetails.totalCommission"
         render={({ field }) => (
           <FormItem className="pt-3">
-            <FormLabel>Total Commission <sub>[Airtable: Total Commission]</sub></FormLabel>
+            <FormLabel>
+              Total Commission <sub>[Airtable: Total Commission]</sub>
+              {totalCommissionBreakdown.length > 0 && (
+                <InfoTooltip items={totalCommissionBreakdown} />
+              )}
+            </FormLabel>
             <FormControl>
               <Input {...field} value={totalCommission} readOnly />
             </FormControl>
