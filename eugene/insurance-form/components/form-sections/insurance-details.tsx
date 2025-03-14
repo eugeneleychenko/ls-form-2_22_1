@@ -133,9 +133,31 @@ function getStateNameFromCode(stateCode: string): string {
 
 // Add a function to calculate enrollment commission based on fee
 const calculateEnrollmentCommission = (enrollmentFee: string): number => {
+  // First, try exact string match for common values
+  if (enrollmentFee === "99") return 10;
+  if (enrollmentFee === "125") return 15;
+  
+  // Then parse for numeric comparison
   const feeValue = parseFloat(enrollmentFee.replace(/[^0-9.]/g, '')) || 0;
-  if (feeValue === 99) return 10;
-  if (feeValue === 125) return 15;
+  
+  console.log("Calculating enrollment commission for fee:", enrollmentFee, "parsed value:", feeValue);
+  
+  // Set commission based on specific fee amounts
+  if (feeValue < 99) {
+    console.log("Fee < 99, commission = 0");
+    return 0;
+  }
+  if (Math.abs(feeValue - 99) < 0.01) {
+    console.log("Fee ≈ 99, commission = 10");
+    return 10;
+  }
+  if (Math.abs(feeValue - 125) < 0.01) {
+    console.log("Fee ≈ 125, commission = 15");
+    return 15;
+  }
+  
+  // Default to 0 for any other values
+  console.log("Fee doesn't match any specific case, commission = 0");
   return 0;
 };
 
@@ -846,7 +868,7 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.commissionRate", displayRate);
     setValue("insuranceDetails.planCommission", calculatedCommission);
     setValue("insuranceDetails.enrollmentFee", `$${enrollmentFee}`);
-    setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
+    setValue("insuranceDetails.enrollmentFeeCommission", `$${enrollmentCommission.toFixed(2)}`);
     setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
     setValue("insuranceDetails.monthlyPremium", `$${monthlyPremium.toFixed(2)}`);
     setPlanCommission(calculatedCommission);
@@ -1145,7 +1167,7 @@ export default function InsuranceDetails() {
     const addonCommissionNumber = parseFloat(addonCommissionValue.replace(/[^0-9.]/g, '') || "0");
     
     // Get enrollment commission
-    const enrollmentCommissionValue = watch("insuranceDetails.enrollmentCommission") || "$0";
+    const enrollmentCommissionValue = watch("insuranceDetails.enrollmentFeeCommission") || "$0";
     const enrollmentCommissionNumber = parseFloat(enrollmentCommissionValue.replace(/[^0-9.]/g, '') || "0");
     
     // Log commission values for debugging
@@ -1330,11 +1352,11 @@ export default function InsuranceDetails() {
         setSelectedEnrollmentFee(sortedOptions[0]);
         setValue("insuranceDetails.enrollmentFee", `$${sortedOptions[0]}`);
         const enrollmentCommission = calculateEnrollmentCommission(sortedOptions[0]);
-        setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
+        setValue("insuranceDetails.enrollmentFeeCommission", `$${enrollmentCommission.toFixed(2)}`);
       } else {
         setSelectedEnrollmentFee("");
         setValue("insuranceDetails.enrollmentFee", "$0");
-        setValue("insuranceDetails.enrollmentCommission", "$0");
+        setValue("insuranceDetails.enrollmentFeeCommission", "$0");
       }
     }
   }, [selectedCarrier, airtableData, setValue]);
@@ -1346,7 +1368,7 @@ export default function InsuranceDetails() {
     
     // Calculate enrollment commission
     const enrollmentCommission = calculateEnrollmentCommission(fee);
-    setValue("insuranceDetails.enrollmentCommission", `$${enrollmentCommission.toFixed(2)}`);
+    setValue("insuranceDetails.enrollmentFeeCommission", `$${enrollmentCommission.toFixed(2)}`);
     
     // Recalculate first month premium
     if (selectedPlan) {
@@ -2006,7 +2028,7 @@ export default function InsuranceDetails() {
 
       <FormField
         control={control}
-        name="insuranceDetails.enrollmentCommission"
+        name="insuranceDetails.enrollmentFeeCommission"
         render={({ field }) => (
           <FormItem>
             <FormLabel>Enrollment Commission <sub>[Airtable: Enrollment Commission]</sub></FormLabel>

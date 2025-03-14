@@ -38,8 +38,8 @@ export default function InsuranceForm() {
       console.log('Submitting form data:', JSON.stringify(data, null, 2));
       const response = await submitToAirtable(data)
       toast.success("Form submitted successfully!")
-      methods.reset()
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      // Reload the page to clear the form instead of just resetting
+      window.location.reload()
     } catch (error) {
       console.error("Error submitting form:", error)
       let errorMessage = "Failed to submit form.";
@@ -85,8 +85,8 @@ export default function InsuranceForm() {
         carrierACA: "Ambetter",
         acaPlanPremium: "450", // Currency field expecting number
         acaPlanDeductible: "2500",
-        enrollmentFee: "100",
-        enrollmentFeeCommission: "20",
+        enrollmentFee: "99",
+        enrollmentFeeCommission: "10",
         americanFinancial1Premium: "50",
         americanFinancial1Commission: "15",
         americanFinancial1Plan: "AF AD&D 50K $93.00", // Add plan name 

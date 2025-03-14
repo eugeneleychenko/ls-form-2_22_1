@@ -17,14 +17,28 @@ export default function BasicInformation() {
             <FormLabel required>
               Lead ID * <sub className="text-xs text-gray-500">[Airtable: Lead ID]</sub>
             </FormLabel>
-            <FormControl>
-              <Input
-                type="text"
-                placeholder="Enter Lead ID (Required, free-form)"
-                {...field}
-                className="border-gray-300 focus:border-primary focus:ring-primary"
-              />
-            </FormControl>
+            <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormControl>
+                <SelectTrigger className="border-gray-300 focus:border-primary focus:ring-primary">
+                  <SelectValue placeholder="Select Lead ID (Required)" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="HULK">HULK</SelectItem>
+                <SelectItem value="White Data">White Data</SelectItem>
+                <SelectItem value="Power Rangers">Power Rangers</SelectItem>
+                <SelectItem value="Orange Data">Orange Data</SelectItem>
+                <SelectItem value="Glorias">Glorias</SelectItem>
+                <SelectItem value="Power Rangers Inbound">Power Rangers Inbound</SelectItem>
+                <SelectItem value="Fire Inbound">Fire Inbound</SelectItem>
+                <SelectItem value="White inbound">White inbound</SelectItem>
+                <SelectItem value="Greens">Greens</SelectItem>
+                <SelectItem value="Red LT">Red LT</SelectItem>
+                <SelectItem value="Orange Inbound">Orange Inbound</SelectItem>
+                <SelectItem value="Yellow">Yellow</SelectItem>
+                <SelectItem value="Spiderman X">Spiderman X</SelectItem>
+              </SelectContent>
+            </Select>
             <FormMessage className="text-destructive" />
           </FormItem>
         )}

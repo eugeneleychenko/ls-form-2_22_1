@@ -12,6 +12,7 @@ A comprehensive, multi-section insurance form built with Next.js, TypeScript, Re
 6. [Utils and Libraries](#utils-and-libraries)
 7. [Making Adjustments](#making-adjustments)
 8. [Environment Variables](#environment-variables)
+9. [Adding Airtable Fields](#adding-airtable-fields)
 
 ## Overview
 
@@ -172,4 +173,74 @@ Required environment variables:
 - `NEXT_PUBLIC_AIRTABLE_BASE_ID`: Airtable base ID
 - `NEXT_PUBLIC_AIRTABLE_TABLE_ID`: Airtable table ID
 
-Copy `.env.example` to `.env` and fill in the values. 
+Copy `.env.example` to `.env` and fill in the values.
+
+## Adding Airtable Fields
+
+If you need to add new fields from Airtable to the form, follow these steps:
+
+### 1. Update Type Definitions
+
+First, add the new field to the appropriate interface in `/types/form.ts`:
+
+```typescript
+// Example: Adding a new field to insuranceDetails
+export interface FormData {
+  // ...
+  insuranceDetails?: {
+    // ... existing fields
+    newAirtableField?: string; // Add the new field here
+  };
+  // ...
+}
+```
+
+### 2. Add Form Field Component
+
+Add the field to the appropriate form section component in `/components/form-sections/`:
+
+```tsx
+// Example for insuranceDetails.tsx
+<FormField
+  control={control}
+  name="insuranceDetails.newAirtableField"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>New Field <sub>[Airtable: New Field]</sub></FormLabel>
+      <FormControl>
+        <Input {...field} />
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>
+```
+
+### 3. Update Airtable Integration
+
+Modify the Airtable submission logic in `/lib/airtable.ts` to include the new field:
+
+1. Find the section that maps form data to Airtable fields
+2. Add the mapping for your new field:
+
+```typescript
+// Example addition to airtable.ts
+// In the transformFormDataToAirtableRecord function:
+fields["New Field"] = data.insuranceDetails?.newAirtableField;
+```
+
+### 4. Debug Panel (Optional)
+
+If the field should be visible in debug mode, update the debug panel in `/components/ui/debug-panel.tsx`:
+
+```tsx
+// Add the field to the appropriate section or to the raw values display
+<div>newAirtableField: {JSON.stringify(insuranceDetails?.newAirtableField)}</div>
+```
+
+### 5. Testing
+
+After adding the new field:
+- Test the form to ensure the field properly accepts input
+- Verify the field data is properly submitted to Airtable
+- Check that the field appears correctly in the debug panel if applicable 

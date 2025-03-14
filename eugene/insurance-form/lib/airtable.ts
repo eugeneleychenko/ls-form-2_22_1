@@ -69,8 +69,7 @@ const invalidFields: string[] = [
   'Selected Add-ons',
   'Add-ons Cost',
   'Commission Rate', // These additional fields appear in the form data but not in Airtable
-  'Add-ons Commission',
-  'Enrollment Commission'
+  'Add-ons Commission'
 ]; // American Financial Plan fields exist in Airtable and should NOT be in this list
 
 const stringFields = [

@@ -14,16 +14,61 @@ This Chrome extension helps streamline form filling by automatically populating 
 
 1. Navigate to the enrollment form page
 2. Click on the Form Prefiller extension icon in your Chrome toolbar
-3. Select your desired data source:
-   - **Use Test Data**: Fills the form with pre-defined test data
-   - **Use Real Submission**: Fills the form with data from a recent submission
+3. Select your desired option:
    - **Search by Name**: Allows you to search for previous submissions by name
 4. If using "Search by Name":
    - Type the first or last name in the search field
-   - Select a person from the results
+   - Select a person from the results (includes creation date in format "Name (MM/DD)")
    - The selected person will be displayed
-5. Click "Fill Form with Test Data" button
+5. Click "Fill Form with Selected Person" button
 6. All form fields will be populated with the selected data
+
+## Features
+
+- Automatically fills all form fields with a single click
+- Properly selects Credit Card payment option
+- Handles form validation events
+- Specific beneficiary handling: 
+  - Sets 'relationship' and 'name' to 'Estate'
+  - Keeps the rest of the beneficiary section blank
+- Leaves Sales Agent name field blank
+- Leaves 'Add notes' section blank
+- Support for adding dependents:
+  - Fills dependent information one at a time
+  - Clicking 'Save Dependent' saves the current dependent and clears the fields for the next one
+- Fetches real submission data from Airtable (only when clicking "Refresh Submissions")
+- Search for specific submissions by name with creation date displayed
+- Current version: 25.3.11
+
+## Fetching Real Submissions
+
+The extension supports fetching real submissions from Airtable. To load real submissions:
+
+1. Click the "Refresh Submissions" button in the popup
+2. The extension will attempt to connect to Airtable and fetch all submissions
+3. If successful, you'll see the updated submission count and can search by name
+
+If you're having trouble connecting to Airtable directly from the extension, you can run the standalone script:
+
+```bash
+cd /Users/eugeneleychenko/Downloads/ls-form-2_22_1
+node submission.js
+```
+
+This will fetch all submissions from Airtable and log them to the console. The extension will try to use these fetched submissions when available.
+
+## Notes
+
+- The extension will attempt to fill all available fields based on the selected data source
+- For security reasons, the extension only works on the specific enrollment form page
+- If an "Invalid Number" message appears for the credit card, it may be due to custom validation on the form
+
+## Icon Replacement
+
+The included icons are placeholders. For a complete extension, replace these with proper icons:
+- icon16.png (16x16)
+- icon48.png (48x48)
+- icon128.png (128x128)
 
 ## Test Data
 
@@ -51,41 +96,9 @@ The extension provides the following test data for form filling:
 - CVV: 123
 - Billing Address: 123 Main St, Little Rock, AR 72201
 
-## Features
-
-- Automatically fills all form fields with a single click
-- Properly selects Credit Card payment option
-- Handles form validation events
-- Provides test data for easy form testing
-- Allows filling with real submission data from Airtable
-- Search for specific submissions by name
-
-## Notes
-
-- The extension will attempt to fill all available fields based on the selected data source
-- For security reasons, the extension only works on the specific enrollment form page
-- If an "Invalid Number" message appears for the credit card, it may be due to custom validation on the form
-
 ## Icon Replacement
 
 The included icons are placeholders. For a complete extension, replace these with proper icons:
 - icon16.png (16x16)
 - icon48.png (48x48)
-- icon128.png (128x128)
-
-## Fetching Real Submissions
-
-The extension now supports fetching real submissions from Airtable. To load real submissions:
-
-1. Click the "Refresh Submissions" button in the popup
-2. The extension will attempt to connect to Airtable and fetch all submissions
-3. If successful, you'll see the updated submission count and can search by name
-
-If you're having trouble connecting to Airtable directly from the extension, you can run the standalone script:
-
-```bash
-cd /Users/eugeneleychenko/Downloads/ls-form-2_22_1
-node submission.js
-```
-
-This will fetch all submissions from Airtable and log them to the console. The extension will try to use these fetched submissions when available. 
+- icon128.png (128x128) 

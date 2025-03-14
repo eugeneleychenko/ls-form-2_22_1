@@ -1,0 +1,34 @@
+Update README and enhance insurance details calculations
+Add InfoTooltip for detailed breakdowns in insurance details
+Refactor section navigation styling and layout
+Add debug mode and enhance form section interactions
+Update email communication flag in form data mapping
+Enhance dependent handling with advanced extraction and multi-dependent support
+Display submission creation date alongside name in search results
+Refine form prefilling with targeted blank sections and controlled Airtable fetching
+Update Chrome extension with form refinements and dependent management
+Simplify form filling logic and remove multiple data source options
+Enhance Chrome extension with advanced submission search and caching
+Add real submission data support to Chrome extension form prefiller
+chrome extension
+Add Bank ACH payment option to billing information section
+Remove number conversion for zip codes in Airtable submission
+Implement comprehensive add-ons handling for AMT and Leo Addons
+Enhance Airtable submission with robust data validation and type conversion
+Add enrollment fees and comprehensive record tracking to mapping and insurance form
+Add Access Health STM support with manual plan cost entry and dynamic commission calculation
+Refactor insurance form with improved scrolling, navigation, and section management
+Add state-based plan and add-on filtering for insurance form
+Add Leo Addons support with multiselect functionality and UI updates
+Enhance insurance form with comprehensive commission tracking and multi-carrier add-ons support
+Update Switch component styling with refined color and positioning
+Refactor add-ons data fetching with improved provider-based organization and enhanced logging
+Add comprehensive add-ons support to insurance form with dynamic data fetching
+Implement dynamic insurance details form with Airtable data fetching
+Downgrade date-fns to version 3.6.0
+Enhance mapping script and project dependencies with comprehensive data processing
+Fix: Update Next.js and React versions, improve Tailwind configuration
+Initial commit with Next.js insurance form setup and environment configuration
+Update dependencies and package configuration
+Move sensitive information to environment variables
+Initial commit: Insurance Form with Airtable Integration
