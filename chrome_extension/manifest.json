@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "First Enroll Form Prefiller",
-  "version": "25.3.11",
+  "version": "25.3.24",
   "description": "Chrome extension to prefill form fields with test data",
   "action": {
     "default_popup": "popup.html",

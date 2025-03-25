@@ -146,7 +146,8 @@ const validateSubmissionData = (data: any) => {
   // Convert date fields to ISO format
   const dateFields = [
     'DOB', 'Dependent 1 DOB', 'Dependent 2 DOB', 'Dependent 3 DOB', 
-    'Dependent 4 DOB', 'Dependent 5 DOB', 'Dependent 6 DOB'
+    'Dependent 4 DOB', 'Dependent 5 DOB', 'Dependent 6 DOB',
+    'Submit Application', 'Effective Date'
   ];
   
   dateFields.forEach(field => {
@@ -209,6 +210,10 @@ export const submitToAirtable = async (formData: FormData) => {
       ...(formData.insuranceDetails?.typeOfInsurance && { 'Type': formData.insuranceDetails.typeOfInsurance }),
       ...(formData.insuranceDetails?.carrierU65 && { 'Carrier U65': formData.insuranceDetails.carrierU65 }),
       ...(formData.insuranceDetails?.plan && { 'Plan': formData.insuranceDetails.plan }),
+      
+      // Submit Application and Effective Date fields
+      ...(formData.insuranceDetails?.submitApplicationDate && { 'Submit Application': ensureDate(formData.insuranceDetails.submitApplicationDate) }),
+      ...(formData.insuranceDetails?.effectiveDate && { 'Effective Date': ensureDate(formData.insuranceDetails.effectiveDate) }),
       
       // Premium and commission fields that do exist in the Airtable schema
       ...(formData.insuranceDetails?.planCost && { 'Carrier U65 Premium': ensureCurrencyString(formData.insuranceDetails.planCost) }),

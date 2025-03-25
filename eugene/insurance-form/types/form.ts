@@ -22,6 +22,7 @@ export interface FormData {
     plan?: string;
     planCost?: string;
     planCommission?: string;
+    commissionRate?: string;
     carrierACA?: string;
     acaPlanPremium?: string;
     acaPlanDeductible?: string;
@@ -53,6 +54,10 @@ export interface FormData {
     selectedAddons?: string[];
     addonsCost?: string;
     addonsCommission?: string;
+    submitApplicationDate?: string;
+    effectiveDate?: string;
+    monthlyPremium?: string;
+    firstMonthPremium?: string;
   };
   personalDetails?: {
     ssn?: string;

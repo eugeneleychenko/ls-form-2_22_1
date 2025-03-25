@@ -2082,6 +2082,44 @@ export default function InsuranceDetails() {
         )}
       />
       
+      {/* Submit Application Date Field */}
+      <FormField
+        control={control}
+        name="insuranceDetails.submitApplicationDate"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Submit Application Date <sub>[Airtable: Submit Application]</sub></FormLabel>
+            <FormControl>
+              <Input 
+                type="date" 
+                {...field}
+                value={field.value || ''} 
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
+      {/* Effective Date Field */}
+      <FormField
+        control={control}
+        name="insuranceDetails.effectiveDate"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Effective Date <sub>[Airtable: Effective Date]</sub></FormLabel>
+            <FormControl>
+              <Input 
+                type="date" 
+                {...field}
+                value={field.value || ''} 
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
       {/* [X] Total Commission Field - Moved here */}
       <FormField
         control={control}

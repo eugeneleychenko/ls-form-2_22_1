@@ -1,0 +1,2 @@
+can we add date fields for "Submit Application" and "Effective Date" to the insurance section of the form and the extension, submit application is the post date field on firstenroll
+Also some of the commissions don't seem to be pulling the correct percentage individual everest 750 is calculating at .35 instead of .30 as an example

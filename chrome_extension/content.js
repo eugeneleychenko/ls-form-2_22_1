@@ -66,6 +66,209 @@ function getFieldValue(fields, possibleFieldNames, defaultValue = "") {
   return defaultValue;
 }
 
+// Helper function to find elements by partial name match (useful for dynamic field names)
+function getElementsByPartialName(partialName) {
+  const elements = [];
+  const allElements = document.getElementsByTagName('*');
+  
+  for (let i = 0; i < allElements.length; i++) {
+    const element = allElements[i];
+    const nameAttr = element.getAttribute('name');
+    
+    if (nameAttr && nameAttr.indexOf(partialName) !== -1) {
+      elements.push(element);
+    }
+  }
+  
+  return elements;
+}
+
+// Helper function to find first element by partial name
+function getElementByPartialName(partialName) {
+  const elements = getElementsByPartialName(partialName);
+  return elements.length > 0 ? elements[0] : null;
+}
+
+// Enhanced function to find date fields by label text
+function findDateFieldByLabel(labelText) {
+  console.log(`Looking for field with label text: "${labelText}"`);
+  
+  // First try the standard approach with partial name
+  let partialName = labelText.toLowerCase().includes('post') ? '_dtBilling' : '_dtEffective';
+  let element = getElementByPartialName(partialName);
+  
+  if (element) {
+    console.log(`Found element by partial name "${partialName}": ${element.name}`);
+    return element;
+  }
+  
+  // If not found, look for any select element near text that matches labelText
+  console.log(`No element found by partial name "${partialName}", trying label-based search`);
+  
+  // Get all text nodes in the document
+  const textNodes = [];
+  const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+  let node;
+  while (node = walk.nextNode()) {
+    textNodes.push(node);
+  }
+  
+  // Find text nodes that contain the label text
+  const matchingNodes = textNodes.filter(node => 
+    node.textContent.trim() && node.textContent.includes(labelText)
+  );
+  
+  console.log(`Found ${matchingNodes.length} text nodes containing "${labelText}"`);
+  
+  // For each matching text node, look for a nearby select element
+  for (const textNode of matchingNodes) {
+    console.log(`Checking near text node: "${textNode.textContent.trim()}"`);
+    
+    // Go up to parent element
+    let parent = textNode.parentElement;
+    if (!parent) continue;
+    
+    // Look for select elements in the parent and nearby elements
+    let searchArea = parent;
+    
+    // Try parent's parent if needed
+    if (!searchArea.querySelector('select')) {
+      searchArea = parent.parentElement || parent;
+    }
+    
+    // Try going up one more level if needed
+    if (!searchArea.querySelector('select')) {
+      searchArea = searchArea.parentElement || searchArea;
+    }
+    
+    // Find all select elements in the search area
+    const selects = searchArea.querySelectorAll('select');
+    if (selects.length > 0) {
+      console.log(`Found ${selects.length} select elements near "${labelText}"`);
+      // Return the first select element
+      element = selects[0];
+      console.log(`Using select element with name: ${element.name}`);
+      return element;
+    }
+  }
+  
+  // Last resort: try to find any select elements that might match based on options
+  console.log(`No select element found near "${labelText}", searching all selects`);
+  const allSelects = document.querySelectorAll('select');
+  
+  for (const select of allSelects) {
+    // Skip selects we've already identified as other fields
+    if (select.hasAttribute('data-checked')) continue;
+    
+    // Check if it has date options
+    if (select.options.length > 0) {
+      const sampleOption = select.options[0].value;
+      if (sampleOption.includes('/') && sampleOption.split('/').length === 3) {
+        console.log(`Found select with date options: ${select.name}`);
+        // Mark this select as checked so we don't use it for multiple fields
+        select.setAttribute('data-checked', 'true');
+        return select;
+      }
+    }
+  }
+  
+  console.log(`No suitable select element found for "${labelText}"`);
+  return null;
+}
+
+// Helper function to handle date dropdown mismatches by finding closest date
+function handleDateDropdownMismatch(element, targetDateString) {
+  console.log(`Date dropdown mismatch. Target: "${targetDateString}", Current: "${element.value}"`);
+  
+  // Ensure we have a valid date format
+  let targetDate;
+  
+  // Try different date formats
+  if (targetDateString.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    // ISO format: YYYY-MM-DD
+    targetDate = new Date(targetDateString);
+    console.log(`Parsed target date from ISO format: ${targetDate}`);
+  } else if (targetDateString.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+    // US format: MM/DD/YYYY
+    const parts = targetDateString.split('/');
+    targetDate = new Date(parts[2], parts[0] - 1, parts[1]);
+    console.log(`Parsed target date from US format: ${targetDate}`);
+  } else {
+    // Try generic date parsing
+    targetDate = new Date(targetDateString);
+    console.log(`Attempted generic date parsing: ${targetDate}`);
+  }
+  
+  // Skip if invalid date
+  if (isNaN(targetDate.getTime())) {
+    console.warn(`Invalid date for ${element.name}: ${targetDateString}`);
+    return;
+  }
+  
+  console.log(`Valid target date: ${targetDate.toISOString()}`);
+  console.log(`Looking for closest match among ${element.options.length} options`);
+  
+  // Find closest date option in dropdown
+  let closestOption = null;
+  let closestDiff = Infinity;
+  let options = Array.from(element.options);
+  
+  // Log all available options
+  console.log("Available options:");
+  options.forEach((option, index) => {
+    console.log(`Option ${index}: ${option.value}`);
+  });
+  
+  for (let i = 0; i < options.length; i++) {
+    const optionValue = options[i].value;
+    
+    // Skip empty options
+    if (!optionValue) continue;
+    
+    let optionDate;
+    
+    // Parse option date
+    if (optionValue.includes('/')) {
+      // MM/DD/YYYY format
+      const parts = optionValue.split('/');
+      if (parts.length === 3 && parts[2].length === 4) {
+        optionDate = new Date(parts[2], parts[0] - 1, parts[1]);
+      }
+    }
+    
+    // Skip if parsing failed
+    if (!optionDate || isNaN(optionDate.getTime())) {
+      console.warn(`Couldn't parse date for option ${i}: ${optionValue}`);
+      continue;
+    }
+    
+    // Calculate difference in days
+    const diff = Math.abs(optionDate.getTime() - targetDate.getTime());
+    const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
+    
+    console.log(`Option ${i}: ${optionValue}, diff: ${diffDays} days`);
+    
+    if (diff < closestDiff) {
+      closestDiff = diff;
+      closestOption = i;
+    }
+  }
+  
+  // Select closest option if found
+  if (closestOption !== null) {
+    console.log(`Selected closest date at index ${closestOption}: ${options[closestOption].value}`);
+    element.selectedIndex = closestOption;
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    // Double check
+    setTimeout(() => {
+      console.log(`After selection, current value is: ${element.value}`);
+    }, 50);
+  } else {
+    console.warn(`No valid date option found in dropdown for ${targetDateString}`);
+  }
+}
+
 // Listen for messages from the popup
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   console.log("Content script received message:", request.action);
@@ -716,6 +919,41 @@ function mapSubmissionToFormData(submission) {
     "Billing Zip", "billingZip", "billing zip", "billing zipcode"
   ]).toString().replace(/,/g, '');
   
+  // Get Submit Application Date (Post Date in FirstEnroll)
+  const submitApplicationDate = getFieldValue(fields, [
+    "Submit Application", "submitApplication", "submit application", "postDate", "post date", "Post Date"
+  ]);
+  console.log('Submit Application Date from submission:', submitApplicationDate);
+  console.log('Available date fields in submission:', Object.keys(fields).filter(key => {
+    const value = fields[key];
+    return (
+      typeof value === 'string' && 
+      (value.includes('-') || value.includes('/')) && 
+      (key.toLowerCase().includes('date') || key.toLowerCase().includes('submit') || key.toLowerCase().includes('post'))
+    );
+  }).map(key => `${key}: ${fields[key]}`));
+  
+  // Get Effective Date
+  const effectiveDate = getFieldValue(fields, [
+    "Effective Date", "effectiveDate", "effective date"
+  ]);
+  console.log('Effective Date from submission:', effectiveDate);
+  
+  // Create fallback dates in case they are missing from Airtable
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const formatDateForForm = (date) => {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${month}/${day}/${year}`;
+  };
+  
+  const defaultPostDate = formatDateForForm(today);
+  const defaultEffectiveDate = formatDateForForm(tomorrow);
+  
   // Include original fields object for reference if other fields are needed
   const result = {
     // Original fields object for reference
@@ -800,13 +1038,18 @@ function mapSubmissionToFormData(submission) {
     pay_state: billingState || state,
     pay_zipcode: billingZip || zipcode,
     
-    // Other fields - hardcoded dates for convenience
-    pd_20277168_dtBilling: "03/06/2025",
-    pd_20277168_dtEffective: "03/07/2025",
+    // Date fields with special handling - will be handled dynamically in fillNonPaymentFields
+    // Use placeholders instead of hardcoded IDs
+    "__POST_DATE__": submitApplicationDate || defaultPostDate,
+    "__EFFECTIVE_DATE__": effectiveDate || defaultEffectiveDate,
     
     // Text/Email communication
     send_text: cellPhone.first + cellPhone.second + cellPhone.third,
-    send_email: email
+    send_email: email,
+    
+    // Additional fields for reference
+    submitApplicationDate: submitApplicationDate || defaultPostDate,
+    effectiveDate: effectiveDate || defaultEffectiveDate,
   };
   
   console.log('Mapped form data with dependent information:', result);
@@ -857,10 +1100,126 @@ function fillNonPaymentFields(testData) {
   // Create a list of payment-related field prefixes to exclude
   const paymentPrefixes = ['cc_', 'pay_'];
   
+  // Handle date fields first - find and set Post Date and Effective Date with dynamic selectors
+  const postDateValue = testData["__POST_DATE__"];
+  const effectiveDateValue = testData["__EFFECTIVE_DATE__"];
+  
+  console.log('Date values from form data:');
+  console.log('- Post Date (Submit Application):', postDateValue);
+  console.log('- Effective Date:', effectiveDateValue);
+  
+  // Find date fields by label text instead of partial name
+  const postDateElement = findDateFieldByLabel('Post Date');
+  const effectiveDateElement = findDateFieldByLabel('Effective Date');
+  
+  // Handle Post Date field
+  if (postDateElement) {
+    console.log(`Found Post Date field: ${postDateElement.name}`);
+    console.log('Current options in Post Date dropdown:');
+    Array.from(postDateElement.options).forEach((option, i) => {
+      console.log(`  Option ${i}: ${option.value}`);
+    });
+    
+    // Format date if needed (YYYY-MM-DD to MM/DD/YYYY)
+    let dateValue = postDateValue;
+    if (dateValue && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const dateParts = dateValue.split('-');
+      if (dateParts.length === 3) {
+        dateValue = `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`;
+        console.log(`Converted Post Date format: ${dateValue}`);
+      }
+    }
+    
+    console.log(`Attempting to set Post Date field to: ${dateValue}`);
+    
+    // Check if the exact value exists in the dropdown
+    let exactMatchFound = false;
+    for (let i = 0; i < postDateElement.options.length; i++) {
+      if (postDateElement.options[i].value === dateValue) {
+        console.log(`Found exact match at option index ${i}`);
+        postDateElement.selectedIndex = i;
+        exactMatchFound = true;
+        break;
+      }
+    }
+    
+    if (!exactMatchFound) {
+      console.log(`No exact match found for ${dateValue} in dropdown, trying closest date`);
+      // Try to set the value first, which might work for some browsers
+      postDateElement.value = dateValue;
+    }
+    
+    // Dispatch change event regardless
+    const changeEvent = new Event('change', { bubbles: true });
+    postDateElement.dispatchEvent(changeEvent);
+    
+    // Find closest date option if exact match not found
+    if (postDateElement.value !== dateValue && !exactMatchFound) {
+      console.log(`Value not set correctly: current="${postDateElement.value}", desired="${dateValue}"`);
+      handleDateDropdownMismatch(postDateElement, dateValue);
+      console.log(`After handleDateDropdownMismatch, value is now: ${postDateElement.value}`);
+    }
+  } else {
+    console.warn('Post Date field not found');
+  }
+  
+  // Handle Effective Date field
+  if (effectiveDateElement) {
+    console.log(`Found Effective Date field: ${effectiveDateElement.name}`);
+    console.log('Current options in Effective Date dropdown:');
+    Array.from(effectiveDateElement.options).forEach((option, i) => {
+      console.log(`  Option ${i}: ${option.value}`);
+    });
+    
+    // Format date if needed (YYYY-MM-DD to MM/DD/YYYY)
+    let dateValue = effectiveDateValue;
+    if (dateValue && dateValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      const dateParts = dateValue.split('-');
+      if (dateParts.length === 3) {
+        dateValue = `${dateParts[1]}/${dateParts[2]}/${dateParts[0]}`;
+        console.log(`Converted Effective Date format: ${dateValue}`);
+      }
+    }
+    
+    console.log(`Attempting to set Effective Date field to: ${dateValue}`);
+    
+    // Check if the exact value exists in the dropdown
+    let exactMatchFound = false;
+    for (let i = 0; i < effectiveDateElement.options.length; i++) {
+      if (effectiveDateElement.options[i].value === dateValue) {
+        console.log(`Found exact match at option index ${i}`);
+        effectiveDateElement.selectedIndex = i;
+        exactMatchFound = true;
+        break;
+      }
+    }
+    
+    if (!exactMatchFound) {
+      console.log(`No exact match found for ${dateValue} in dropdown, trying closest date`);
+      // Try to set the value first, which might work for some browsers
+      effectiveDateElement.value = dateValue;
+    }
+    
+    // Dispatch change event regardless
+    const changeEvent = new Event('change', { bubbles: true });
+    effectiveDateElement.dispatchEvent(changeEvent);
+    
+    // Find closest date option if exact match not found
+    if (effectiveDateElement.value !== dateValue && !exactMatchFound) {
+      console.log(`Value not set correctly: current="${effectiveDateElement.value}", desired="${dateValue}"`);
+      handleDateDropdownMismatch(effectiveDateElement, dateValue);
+      console.log(`After handleDateDropdownMismatch, value is now: ${effectiveDateElement.value}`);
+    }
+  } else {
+    console.warn('Effective Date field not found');
+  }
+  
   // Fill text inputs and textareas
   Object.keys(testData).forEach(key => {
-    // Skip payment fields for now
-    if (paymentPrefixes.some(prefix => key.startsWith(prefix))) {
+    // Skip payment fields and special placeholder fields
+    if (paymentPrefixes.some(prefix => key.startsWith(prefix)) ||
+        key === "__POST_DATE__" || 
+        key === "__EFFECTIVE_DATE__") {
       return;
     }
     
@@ -876,16 +1235,19 @@ function fillNonPaymentFields(testData) {
     }
   });
   
-  // Fill select dropdowns (excluding payment fields)
+  // Fill select dropdowns (excluding payment fields and special fields)
   Object.keys(testData).forEach(key => {
-    // Skip payment fields for now
-    if (paymentPrefixes.some(prefix => key.startsWith(prefix))) {
+    // Skip payment fields and special placeholder fields
+    if (paymentPrefixes.some(prefix => key.startsWith(prefix)) ||
+        key === "__POST_DATE__" || 
+        key === "__EFFECTIVE_DATE__") {
       return;
     }
     
     const elements = document.getElementsByName(key);
     if (elements.length > 0) {
       const element = elements[0];
+      
       if (element.tagName === 'SELECT') {
         // Log select element values for debugging
         if (key.includes('dob')) {
