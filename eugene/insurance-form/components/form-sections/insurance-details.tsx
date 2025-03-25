@@ -2226,6 +2226,29 @@ export default function InsuranceDetails() {
         )}
       />
       
+      {/* [X] Total Commission Field - Moved here */}
+      <FormField
+        control={control}
+        name="insuranceDetails.totalCommission"
+        render={({ field }) => (
+          <FormItem className="pt-3">
+            <FormLabel>
+              Total Commission <sub>[Airtable: Total Commission]</sub>
+              {totalCommissionBreakdown.length > 0 && (
+                <InfoTooltip items={totalCommissionBreakdown} />
+              )}
+            </FormLabel>
+            <FormControl>
+              <Input {...field} value={totalCommission} readOnly />
+            </FormControl>
+            <FormDescription className="text-sm text-muted-foreground">
+              Includes: Plan Commission + Add-ons Commission + Enrollment Commission
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+      
       {/* Submit Application Date Field */}
       <FormField
         control={control}
@@ -2259,29 +2282,6 @@ export default function InsuranceDetails() {
                 value={field.value || ''} 
               />
             </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      
-      {/* [X] Total Commission Field - Moved here */}
-      <FormField
-        control={control}
-        name="insuranceDetails.totalCommission"
-        render={({ field }) => (
-          <FormItem className="pt-3">
-            <FormLabel>
-              Total Commission <sub>[Airtable: Total Commission]</sub>
-              {totalCommissionBreakdown.length > 0 && (
-                <InfoTooltip items={totalCommissionBreakdown} />
-              )}
-            </FormLabel>
-            <FormControl>
-              <Input {...field} value={totalCommission} readOnly />
-            </FormControl>
-            <FormDescription className="text-sm text-muted-foreground">
-              Includes: Plan Commission + Add-ons Commission + Enrollment Commission
-            </FormDescription>
             <FormMessage />
           </FormItem>
         )}
