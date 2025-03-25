@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { toast } from "sonner"
 
 // Define types for the Airtable response
 interface AirtableRecord {
@@ -479,9 +480,23 @@ export default function InsuranceDetails() {
         // Collect all enrollment fees by carrier
         const allEnrollmentFeesByCarrier: Record<string, Set<string>> = {};
         
+        // NEW: Enhanced debugging for plan commission issues
+        const plansWithCommissions: Record<string, any> = {};
+        
         data.records.forEach(record => {
           const type = record.fields.Type;
           const carrier = record.fields.Carriers;
+          
+          // NEW: Special logging for Everest plans
+          if (carrier && carrier.includes('Everest')) {
+            console.log(`EVEREST PLAN FOUND - ${record.id}`);
+            // Log all fields to see what's available
+            Object.keys(record.fields).forEach(key => {
+              if (key.includes('Commission')) {
+                console.log(`  ${key}: ${record.fields[key]}`);
+              }
+            });
+          }
           
           // Track enrollment fees by carrier
           if (carrier && record.fields["Enrollment Fees"]) {
@@ -540,9 +555,26 @@ export default function InsuranceDetails() {
             if (record.fields[planKey] && record.fields[planCostKey]) {
               const planName = String(record.fields[planKey]).trim();
               const planCost = String(record.fields[planCostKey]).trim();
-              const planCommission = record.fields[planCommissionKey] 
-                ? String(record.fields[planCommissionKey]).trim() 
-                : "0";
+              
+              // CRITICAL FIX: Ensure commission values are properly extracted and never empty
+              let planCommission = "0.3"; // Default to 30% if not specified
+              
+              // If a commission value exists in the record, use it
+              if (record.fields[planCommissionKey]) {
+                const rawCommission = record.fields[planCommissionKey];
+                // Convert commission to string, handling different formats
+                if (typeof rawCommission === 'number') {
+                  // If it's a decimal (e.g., 0.3), it's already in proper format
+                  planCommission = String(rawCommission);
+                } else if (typeof rawCommission === 'string') {
+                  // If it's a string, clean it
+                  const cleaned = rawCommission.replace(/[^0-9.]/g, '');
+                  planCommission = cleaned || "0.3"; // Use default if parsing fails
+                }
+              }
+              
+              // Log commission info for debugging
+              plansWithCommissions[`${carrier}:${planName}`] = planCommission;
               
               // Only add if we have both a plan name and cost
               if (planName && planCost) {
@@ -555,6 +587,9 @@ export default function InsuranceDetails() {
             }
           }
         });
+        
+        // Log all plans with their commission values for debugging
+        console.log("Plans with commissions:", plansWithCommissions);
         
         // Store enrollment fee options for easy access
         console.log("Enrollment fees by carrier:", allEnrollmentFeesByCarrier);
@@ -716,20 +751,85 @@ export default function InsuranceDetails() {
         
         // Handle commission similarly
         const rawCommission = allData[selectedType].plans[selectedCarrier].planCommissions[planIndex];
-        const commissionStr = typeof rawCommission === 'object' ? 
-          JSON.stringify(rawCommission) : 
-          (typeof rawCommission === 'string' ? rawCommission : String(rawCommission || "0"));
         
-        // Check if commission is in decimal format (e.g., 0.30, 0.35)
-        const commissionValue = parseFloat(commissionStr.replace(/[^0-9.]/g, ''));
+        // Enhanced debugging for commission values
+        console.log(`========== COMMISSION DEBUG ==========`);
+        console.log(`Plan: ${plan} (Index: ${planIndex})`);
+        console.log(`Type: ${selectedType}, Carrier: ${selectedCarrier}`);
+        console.log(`Raw commission direct from allData:`, rawCommission);
         
-        // If commission is in decimal format (between 0 and 1), convert to percentage
-        // Otherwise, use the value as is
-        const finalCommission = (commissionValue > 0 && commissionValue <= 1) ? 
-          (commissionValue * 100).toString() : 
-          commissionStr.replace(/[^0-9.]/g, '');
+        // Check what's in the array
+        console.log(`All commission values for this carrier:`, 
+          allData[selectedType].plans[selectedCarrier].planCommissions);
+          
+        // Check for any mismatches
+        if (rawCommission === undefined || rawCommission === null) {
+          console.warn(`⚠️ Commission value missing for ${plan}`);
+          
+          // Try to find the record in raw data for additional debugging
+          const matchingRecords = airtableData.filter(record => 
+            record.fields.Type === selectedType && 
+            record.fields.Carriers === selectedCarrier &&
+            record.fields[`Plan ${planIndex + 1}`] === plan
+          );
+          
+          if (matchingRecords.length > 0) {
+            console.log(`Found original record in raw data:`, matchingRecords[0].fields);
+            console.log(`Original commission value:`, matchingRecords[0].fields[`Plan ${planIndex + 1} Commission`]);
+          } else {
+            console.warn(`Could not find matching record in raw data`);
+          }
+        }
+        console.log(`======================================`);
         
-        commissionMap[plan] = finalCommission || "0"; // [X] Map commissions
+        // Proper handling of commission value with different formats
+        let finalCommission = "0";
+        
+        if (rawCommission) {
+          // Convert to string first to ensure consistent handling
+          const commissionStr = typeof rawCommission === 'object' ? 
+            JSON.stringify(rawCommission) : 
+            (typeof rawCommission === 'string' ? rawCommission : String(rawCommission));
+          
+          // Save the original string for debugging
+          const originalCommissionStr = commissionStr;
+          
+          // First, check if it's a decimal value like 0.3 (representing 30%)
+          const decimalMatch = commissionStr.match(/0?\.\d+/);
+          if (decimalMatch) {
+            // It's already in decimal format (e.g., 0.3 for 30%)
+            const decimalValue = parseFloat(decimalMatch[0]);
+            finalCommission = (decimalValue * 100).toFixed(0);
+            console.log(`Decimal commission found: ${decimalValue} -> ${finalCommission}%`);
+          } else {
+            // Try to extract a numeric value, ignoring non-numeric characters
+            const cleanCommissionStr = commissionStr.replace(/[^0-9.]/g, '');
+            const numericValue = parseFloat(cleanCommissionStr);
+            
+            if (!isNaN(numericValue)) {
+              if (numericValue <= 1) {
+                // Small value is likely a decimal percentage (e.g., 0.3 for 30%)
+                finalCommission = (numericValue * 100).toFixed(0);
+                console.log(`Small numeric commission found: ${numericValue} -> ${finalCommission}%`);
+              } else {
+                // Larger value is likely already a percentage (e.g., 30 for 30%)
+                finalCommission = numericValue.toFixed(0);
+                console.log(`Percentage commission found: ${numericValue}% -> ${finalCommission}%`);
+              }
+            } else {
+              console.log(`Unable to parse commission: "${originalCommissionStr}"`);
+              finalCommission = "0";
+            }
+          }
+        } else {
+          console.log(`No commission found for plan: ${plan}`);
+        }
+        
+        // Log the final processed commission value
+        console.log(`Final commission for ${plan}: ${finalCommission}%`);
+        
+        // Store the final commission value in the map
+        commissionMap[plan] = finalCommission;
         
         // Find the record for this plan in the raw data
         const planNumberForSearch = planIndex + 1;
@@ -791,19 +891,63 @@ export default function InsuranceDetails() {
     }
     
     const cost = planCosts[planName] || "";
-    let commissionRate = planCommissions[planName] || "0";
+    let commissionRate = planCommissions[planName] || "30"; // Default to 30% if not found
     
     // Log commission data for debugging
-    console.log("Raw commission rate:", commissionRate, "Type:", typeof commissionRate);
+    console.log(`🔍 Commission Debug for ${planName}:`, {
+      rawRate: commissionRate,
+      type: typeof commissionRate
+    });
     
-    // Special handling for Sigma Care Plus and other carriers with decimal commissions
-    if (parseFloat(commissionRate) > 0) {
-      // Commission rate is already handled above where we create the commissionMap
-      console.log("Using existing commission rate:", commissionRate);
+    // Ensure commission rate is a valid number by parsing it properly
+    let parsedCommissionRate: number;
+    
+    // Handle different commission rate formats (decimal, percentage, or string)
+    if (typeof commissionRate === 'string') {
+      // If it's a string, check if it's decimal format (0.3) or percentage (30)
+      const cleaned = commissionRate.replace(/[^0-9.]/g, '');
+      const value = parseFloat(cleaned);
+      
+      if (!isNaN(value)) {
+        if (value <= 1) {
+          // It's in decimal format (0.3 for 30%)
+          parsedCommissionRate = value * 100;
+          commissionRate = parsedCommissionRate.toString();
+          console.log(`  Decimal format detected: ${value} → ${parsedCommissionRate}%`);
+        } else {
+          // It's already a percentage (30 for 30%)
+          parsedCommissionRate = value;
+          commissionRate = value.toString();
+          console.log(`  Percentage format detected: ${value}%`);
+        }
+      } else {
+        // Invalid format, use 30% as default
+        parsedCommissionRate = 30;
+        commissionRate = "30";
+        console.error(`  ⚠️ Invalid commission format: "${commissionRate}" - using 30% default`);
+      }
+    } else if (typeof commissionRate === 'number') {
+      // If it's already a number, check if it's decimal or percentage
+      if (commissionRate <= 1) {
+        parsedCommissionRate = commissionRate * 100;
+        commissionRate = parsedCommissionRate.toString();
+      } else {
+        parsedCommissionRate = commissionRate;
+        commissionRate = commissionRate.toString();
+      }
     } else {
-      // Fallback to a default commission if no valid rate is found
-      console.log("No valid commission rate found, using default");
-      commissionRate = selectedCarrier.toLowerCase().includes("sigma") ? "30" : "20";
+      // If it's neither string nor number, default to 30%
+      parsedCommissionRate = 30;
+      commissionRate = "30";
+      console.error(`  ⚠️ Unknown commission format: ${typeof commissionRate} - using 30% default`);
+    }
+    
+    // Commission rates should always come from Airtable, but use default if missing
+    if (parsedCommissionRate === 0) {
+      console.warn(`  ⚠️ Zero commission rate found - using 30% default`);
+      parsedCommissionRate = 30;
+      commissionRate = "30";
+      toast.warning(`No commission rate found for ${planName}. Using 30% default.`);
     }
     
     // Use the selected enrollment fee from dropdown instead of planEnrollmentFees
@@ -873,7 +1017,7 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.monthlyPremium", `$${monthlyPremium.toFixed(2)}`);
     setPlanCommission(calculatedCommission);
     
-    // Calculate total commission (plan + addons)
+    // Calculate total commission
     calculateTotalCommission(calculatedCommission, selectedAddons);
   };
 
