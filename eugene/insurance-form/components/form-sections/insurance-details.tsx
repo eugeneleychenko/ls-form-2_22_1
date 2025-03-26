@@ -388,12 +388,21 @@ export default function InsuranceDetails() {
               // Handle commission values properly
               let planCommission = "0";
               if (record.fields[planCommissionKey]) {
-                const commissionValue = record.fields[planCommissionKey];
-                if (typeof commissionValue === 'string') {
-                  planCommission = commissionValue.replace(/\$+/g, '').trim();
-                } else if (typeof commissionValue === 'number') {
-                  planCommission = commissionValue.toString();
+                const rawCommission = record.fields[planCommissionKey];
+                // Convert commission to string, handling different formats
+                if (typeof rawCommission === 'number') {
+                  // If it's a decimal (e.g., 0.3), it's already in proper format
+                  planCommission = String(rawCommission);
+                  console.log(`Commission for ${planName} (decimal): ${planCommission}`);
+                } else if (typeof rawCommission === 'string') {
+                  // If it's a string, preserve it - could be percentage or decimal
+                  planCommission = rawCommission;
+                  console.log(`Commission for ${planName} (string): ${planCommission}`);
+                } else {
+                  console.warn(`Unknown commission type for ${planName}: ${typeof rawCommission}`);
                 }
+              } else {
+                console.warn(`No commission found for ${planName}, using default 0.3`);
               }
               
               // Check if the plan is available in the selected state
@@ -566,11 +575,16 @@ export default function InsuranceDetails() {
                 if (typeof rawCommission === 'number') {
                   // If it's a decimal (e.g., 0.3), it's already in proper format
                   planCommission = String(rawCommission);
+                  console.log(`Commission for ${planName} (decimal): ${planCommission}`);
                 } else if (typeof rawCommission === 'string') {
-                  // If it's a string, clean it
-                  const cleaned = rawCommission.replace(/[^0-9.]/g, '');
-                  planCommission = cleaned || "0.3"; // Use default if parsing fails
+                  // If it's a string, preserve it - could be percentage or decimal
+                  planCommission = rawCommission;
+                  console.log(`Commission for ${planName} (string): ${planCommission}`);
+                } else {
+                  console.warn(`Unknown commission type for ${planName}: ${typeof rawCommission}`);
                 }
+              } else {
+                console.warn(`No commission found for ${planName}, using default 0.3`);
               }
               
               // Log commission info for debugging
@@ -614,20 +628,53 @@ export default function InsuranceDetails() {
         for (const type in dataByType) {
           dataByType[type].carriers.sort();
           
-          // Sort plans for each carrier
+          // DO NOT sort plans alphabetically - preserve the original order from Airtable
           for (const carrier in dataByType[type].plans) {
-            // Create pairs of plan names and costs for sorting
-            const pairs = dataByType[type].plans[carrier].planNames.map((name, index) => ({
+            // Create pairs of plan names, costs, and commissions with their original index
+            interface PlanInfo {
+              name: string;
+              cost: string;
+              commission: string;
+              originalIndex: number;
+            }
+            
+            const pairs: PlanInfo[] = dataByType[type].plans[carrier].planNames.map((name, idx) => ({
               name,
-              cost: dataByType[type].plans[carrier].planCosts[index]
+              cost: dataByType[type].plans[carrier].planCosts[idx],
+              commission: dataByType[type].plans[carrier].planCommissions[idx],
+              originalIndex: idx // Keep track of original position
             }));
             
-            // Sort by plan name
-            pairs.sort((a, b) => a.name.localeCompare(b.name));
+            // Sort by the plan number if possible (extract number from plan name)
+            pairs.sort((a: PlanInfo, b: PlanInfo) => {
+              // Try to extract plan numbers (e.g., "Premier 100", "Premier 200", etc.)
+              const aMatch = a.name.match(/(\d+)/);
+              const bMatch = b.name.match(/(\d+)/);
+              
+              if (aMatch && bMatch) {
+                const aNum = parseInt(aMatch[1], 10);
+                const bNum = parseInt(bMatch[1], 10);
+                
+                // Sort by numeric value if both have numbers
+                if (!isNaN(aNum) && !isNaN(bNum)) {
+                  return aNum - bNum;
+                }
+              }
+              
+              // If we can't extract numbers, preserve original order
+              return a.originalIndex - b.originalIndex;
+            });
             
-            // Update the arrays with sorted values
+            // Update the arrays with sorted values, preserving all data
             dataByType[type].plans[carrier].planNames = pairs.map(p => p.name);
             dataByType[type].plans[carrier].planCosts = pairs.map(p => p.cost);
+            dataByType[type].plans[carrier].planCommissions = pairs.map(p => p.commission);
+            
+            // Log the sorted plans for debugging
+            console.log(`Sorted plans for ${carrier} (${type}):`);
+            pairs.forEach((p, i) => {
+              console.log(`  ${i+1}. ${p.name} - Commission: ${p.commission}`);
+            });
           }
         }
         
@@ -891,62 +938,64 @@ export default function InsuranceDetails() {
     }
     
     const cost = planCosts[planName] || "";
-    let commissionRate = planCommissions[planName] || "30"; // Default to 30% if not found
+    // Get commission rate with fallback to default
+    const rawCommissionRate = planCommissions[planName] || "0.3"; 
     
     // Log commission data for debugging
     console.log(`🔍 Commission Debug for ${planName}:`, {
-      rawRate: commissionRate,
-      type: typeof commissionRate
+      rawRate: rawCommissionRate,
+      type: typeof rawCommissionRate
     });
     
     // Ensure commission rate is a valid number by parsing it properly
-    let parsedCommissionRate: number;
+    let parsedCommissionRate: number = 0.3; // Default value
+    let displayCommissionRate: string = "30%"; // Default display value
     
-    // Handle different commission rate formats (decimal, percentage, or string)
-    if (typeof commissionRate === 'string') {
+    // Convert the commission rate to a decimal number for calculations
+    if (typeof rawCommissionRate === 'string') {
       // If it's a string, check if it's decimal format (0.3) or percentage (30)
-      const cleaned = commissionRate.replace(/[^0-9.]/g, '');
+      const cleaned = rawCommissionRate.replace(/[^0-9.]/g, '');
       const value = parseFloat(cleaned);
       
       if (!isNaN(value)) {
         if (value <= 1) {
           // It's in decimal format (0.3 for 30%)
-          parsedCommissionRate = value * 100;
-          commissionRate = parsedCommissionRate.toString();
-          console.log(`  Decimal format detected: ${value} → ${parsedCommissionRate}%`);
+          parsedCommissionRate = value;
+          displayCommissionRate = `${(value * 100).toFixed(0)}%`;
+          console.log(`  Decimal format detected: ${value} → ${parsedCommissionRate * 100}%`);
         } else {
           // It's already a percentage (30 for 30%)
-          parsedCommissionRate = value;
-          commissionRate = value.toString();
+          parsedCommissionRate = value / 100;
+          displayCommissionRate = `${value}%`;
           console.log(`  Percentage format detected: ${value}%`);
         }
       } else {
         // Invalid format, use 30% as default
-        parsedCommissionRate = 30;
-        commissionRate = "30";
-        console.error(`  ⚠️ Invalid commission format: "${commissionRate}" - using 30% default`);
+        parsedCommissionRate = 0.3;
+        displayCommissionRate = "30%";
+        console.error(`  ⚠️ Invalid commission format: "${rawCommissionRate}" - using 30% default`);
       }
-    } else if (typeof commissionRate === 'number') {
+    } else if (typeof rawCommissionRate === 'number') {
       // If it's already a number, check if it's decimal or percentage
-      if (commissionRate <= 1) {
-        parsedCommissionRate = commissionRate * 100;
-        commissionRate = parsedCommissionRate.toString();
+      if (rawCommissionRate <= 1) {
+        parsedCommissionRate = rawCommissionRate;
+        displayCommissionRate = `${(rawCommissionRate * 100).toFixed(0)}%`;
       } else {
-        parsedCommissionRate = commissionRate;
-        commissionRate = commissionRate.toString();
+        parsedCommissionRate = rawCommissionRate / 100;
+        displayCommissionRate = `${rawCommissionRate}%`;
       }
     } else {
       // If it's neither string nor number, default to 30%
-      parsedCommissionRate = 30;
-      commissionRate = "30";
-      console.error(`  ⚠️ Unknown commission format: ${typeof commissionRate} - using 30% default`);
+      parsedCommissionRate = 0.3;
+      displayCommissionRate = "30%";
+      console.error(`  ⚠️ Unknown commission format: ${typeof rawCommissionRate} - using 30% default`);
     }
     
     // Commission rates should always come from Airtable, but use default if missing
     if (parsedCommissionRate === 0) {
       console.warn(`  ⚠️ Zero commission rate found - using 30% default`);
-      parsedCommissionRate = 30;
-      commissionRate = "30";
+      parsedCommissionRate = 0.3;
+      displayCommissionRate = "30%";
       toast.warning(`No commission rate found for ${planName}. Using 30% default.`);
     }
     
@@ -971,8 +1020,7 @@ export default function InsuranceDetails() {
     const addonsCostValue = parseFloat(addonsTotalCost.replace(/[^0-9.]/g, '') || "0");
     
     // Calculate commission as a dollar amount
-    let calculatedCommission = `$${(parseFloat(commissionRate) * 0.01 * costValue).toFixed(2)}`;
-    let displayRate = commissionRate + "%";
+    let calculatedCommission = `$${(parsedCommissionRate * costValue).toFixed(2)}`;
     
     // Calculate first month premium (cost + enrollment fee + add-ons)
     const firstMonthPremium = costValue + enrollmentFeeValue + addonsCostValue;
@@ -1002,14 +1050,14 @@ export default function InsuranceDetails() {
     setFirstMonthBreakdown(firstMonthBreakdownItems);
     
     console.log("Setting plan cost to:", formattedCost);
-    console.log("Commission rate:", commissionRate);
+    console.log("Commission rate:", displayCommissionRate);
     console.log("Calculated commission:", calculatedCommission);
     console.log("Enrollment fee:", `$${enrollmentFee}`);
     console.log("First month premium:", `$${firstMonthPremium.toFixed(2)}`);
     console.log("Monthly premium:", `$${monthlyPremium.toFixed(2)}`);
     
     setValue("insuranceDetails.planCost", formattedCost);
-    setValue("insuranceDetails.commissionRate", displayRate);
+    setValue("insuranceDetails.commissionRate", displayCommissionRate);
     setValue("insuranceDetails.planCommission", calculatedCommission);
     setValue("insuranceDetails.enrollmentFee", `$${enrollmentFee}`);
     setValue("insuranceDetails.enrollmentFeeCommission", `$${enrollmentCommission.toFixed(2)}`);
@@ -1302,7 +1350,7 @@ export default function InsuranceDetails() {
   };
   
   // [X] Calculate total commission (plan + addons)
-  const calculateTotalCommission = (planCommissionValue: string, selectedAddons: string[]) => {
+  const calculateTotalCommission = (planCommissionValue: string, selectedAddons: string[]): void => {
     // Extract plan commission value
     const planCommissionNumber = parseFloat(planCommissionValue.replace(/[^0-9.]/g, '') || "0");
     

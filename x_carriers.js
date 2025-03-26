@@ -66,6 +66,35 @@ function formatValue(value) {
 }
 
 /**
+ * Format the coverage value to properly handle percentage format
+ * @param {*} coverage - The coverage value from Airtable
+ * @returns {string} The formatted coverage value
+ */
+function formatCoverage(coverage) {
+  if (coverage === undefined || coverage === null) {
+    return '0.30'; // Default to 30%
+  }
+  
+  // If it's a string with a % sign, convert it to decimal
+  if (typeof coverage === 'string' && coverage.includes('%')) {
+    const numericValue = parseFloat(coverage.replace('%', '')) / 100;
+    return numericValue.toString();
+  }
+  
+  // If it's already a number or numeric string, ensure it's in decimal form
+  const numericValue = parseFloat(coverage);
+  if (!isNaN(numericValue)) {
+    // If value is greater than 1, assume it's a percentage and convert to decimal
+    if (numericValue > 1) {
+      return (numericValue / 100).toString();
+    }
+    return numericValue.toString();
+  }
+  
+  return '0.30'; // Default to 30% if can't parse
+}
+
+/**
  * Process carrier data to match the table structure
  * @param {Array} records - Raw carrier records from Airtable
  * @returns {Array} Processed carrier records
@@ -75,8 +104,19 @@ function processCarrierData(records) {
     const carrier = {
       id: record.id,
       name: record.fields.Name || 'N/A',
+      // Store the insurance type if available
+      type: record.fields.Type || 'Unknown',
       plans: []
     };
+    
+    // Get all commission rates from the record
+    const commissionRates = {};
+    for (let i = 1; i <= 14; i++) {
+      const rateField = `Plan ${i} Commission`;
+      if (record.fields[rateField] !== undefined) {
+        commissionRates[i] = formatCoverage(record.fields[rateField]);
+      }
+    }
     
     // Process Plan 1
     if (record.fields['Plan 1']) {
@@ -84,7 +124,7 @@ function processCarrierData(records) {
         planNumber: 1,
         name: record.fields['Plan 1'],
         cost: formatValue(record.fields['Plan 1 Cost']),
-        coverage: formatValue(record.fields['Plan 1 Coverage'] || 0.30)
+        coverage: commissionRates[1] || formatCoverage(record.fields['Plan 1 Coverage'])
       });
     }
     
@@ -94,7 +134,7 @@ function processCarrierData(records) {
         planNumber: 2,
         name: record.fields['Plan 2'],
         cost: formatValue(record.fields['Plan 2 Cost']),
-        coverage: formatValue(record.fields['Plan 2 Coverage'] || 0.30)
+        coverage: commissionRates[2] || formatCoverage(record.fields['Plan 2 Coverage'])
       });
     }
     
@@ -103,14 +143,13 @@ function processCarrierData(records) {
     for (let i = 3; i <= 14; i++) {
       const planField = `Plan ${i}`;
       const costField = `Plan ${i} Cost`;
-      const coverageField = `Plan ${i} Coverage`;
       
       if (record.fields[planField]) {
         carrier.plans.push({
           planNumber: i,
           name: record.fields[planField],
           cost: formatValue(record.fields[costField]),
-          coverage: formatValue(record.fields[coverageField] || 0.30)
+          coverage: commissionRates[i] || formatCoverage(record.fields[`Plan ${i} Coverage`])
         });
       }
     }
@@ -293,17 +332,145 @@ async function checkHealthChoiceSilverPlans() {
   });
 }
 
+/**
+ * Checks plans for a specific carrier, plan name, and insurance type
+ * @param {string} carrierName - The carrier name to filter by (optional)
+ * @param {string} planName - The plan name to filter by
+ * @param {string} insuranceType - The insurance type to filter by (optional)
+ */
+async function checkSpecificPlan(carrierName, planName, insuranceType) {
+  const carriers = await fetchCarriers();
+  
+  if (carriers.length === 0) {
+    console.log('No carriers to display');
+    return;
+  }
+  
+  console.log(`\n=== CHECKING PLANS: ${planName} ${carrierName ? `(${carrierName})` : ''} ${insuranceType ? `[${insuranceType}]` : ''} ===\n`);
+  
+  let found = false;
+  
+  carriers.forEach(carrier => {
+    // Skip if carrierName is provided and doesn't match
+    if (carrierName && !carrier.name.toLowerCase().includes(carrierName.toLowerCase())) {
+      return;
+    }
+    
+    // Skip if insuranceType is provided and doesn't match carrier type
+    if (insuranceType && carrier.type && 
+        !carrier.type.toLowerCase().includes(insuranceType.toLowerCase())) {
+      return;
+    }
+    
+    // Filter plans that match the planName
+    const matchingPlans = carrier.plans.filter(plan => 
+      plan.name.toLowerCase().includes(planName.toLowerCase())
+    );
+    
+    if (matchingPlans.length > 0) {
+      found = true;
+      console.log(`Carrier: ${carrier.name} (ID: ${carrier.id})`);
+      console.log(`Type: ${carrier.type || 'Unknown'}`);
+      
+      matchingPlans.forEach(plan => {
+        console.log(`  Plan: ${plan.name}`);
+        console.log(`    Cost: ${plan.cost}`);
+        console.log(`    Commission Rate: ${parseFloat(plan.coverage) * 100}%`);
+        
+        // Calculate commission amount
+        const costValue = parseFloat(plan.cost.replace(/[^0-9.-]+/g, ''));
+        const commissionRate = parseFloat(plan.coverage);
+        if (!isNaN(costValue) && !isNaN(commissionRate)) {
+          const commission = costValue * commissionRate;
+          console.log(`    Commission Amount: $${commission.toFixed(2)}`);
+        }
+        
+        console.log(''); // Add a blank line for readability
+      });
+    }
+  });
+  
+  if (!found) {
+    console.log(`No plans found matching '${planName}'${carrierName ? ` for carrier '${carrierName}'` : ''}${insuranceType ? ` with type '${insuranceType}'` : ''}`);
+  }
+}
+
+/**
+ * Lists all distinct insurance types found in the data
+ */
+async function listInsuranceTypes() {
+  const carriers = await fetchCarriers();
+  
+  if (carriers.length === 0) {
+    console.log('No carriers to display');
+    return;
+  }
+  
+  console.log('\n=== AVAILABLE INSURANCE TYPES ===\n');
+  
+  // Create a set to track unique types
+  const uniqueTypes = new Set();
+  
+  // Extract insurance types from carriers
+  carriers.forEach(carrier => {
+    if (carrier.type && carrier.type.trim() !== '') {
+      uniqueTypes.add(carrier.type);
+    }
+  });
+  
+  // Display all found types
+  if (uniqueTypes.size > 0) {
+    console.log('Insurance types found:');
+    Array.from(uniqueTypes).sort().forEach(type => {
+      console.log(`- ${type}`);
+    });
+  } else {
+    console.log('No specific insurance types could be identified in the data.');
+    console.log('You may need to check the Airtable structure for how types are stored.');
+  }
+}
+
 // Export functions for use in other files
 module.exports = {
   fetchCarriers,
   displayCarriersTable,
   checkEverestPlans,
-  checkHealthChoiceSilverPlans
+  checkHealthChoiceSilverPlans,
+  checkSpecificPlan,
+  listInsuranceTypes
 };
 
 // If this file is run directly, execute the display function
 if (require.main === module) {
-  // displayCarriersTable();
-  // checkEverestPlans();
-  checkHealthChoiceSilverPlans();
+  // Parse command line arguments
+  const args = process.argv.slice(2);
+  if (args.length > 0) {
+    const command = args[0].toLowerCase();
+    
+    if (command === 'carriers') {
+      displayCarriersTable();
+    } else if (command === 'everest') {
+      checkEverestPlans();
+    } else if (command === 'healthchoice') {
+      checkHealthChoiceSilverPlans();
+    } else if (command === 'check') {
+      const planName = args[1];
+      const carrierName = args[2];
+      const insuranceType = args[3];
+      
+      if (!planName) {
+        console.error('Error: Plan name is required. Usage: node x_carriers.js check "Plan Name" ["Carrier Name"] ["Insurance Type"]');
+      } else {
+        checkSpecificPlan(carrierName, planName, insuranceType);
+        return; // Exit early to prevent running the default function below
+      }
+    } else if (command === 'types') {
+      listInsuranceTypes();
+    } else {
+      console.log('Unknown command. Available commands: carriers, everest, healthchoice, check, types');
+    }
+  } else {
+    // Default to health choice if no command provided
+    checkHealthChoiceSilverPlans();
+  }
 }
