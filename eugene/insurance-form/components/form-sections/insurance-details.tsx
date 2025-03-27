@@ -622,8 +622,24 @@ export default function InsuranceDetails() {
               cost: dataByType[type].plans[carrier].planCosts[index]
             }));
             
-            // Sort by plan name
-            pairs.sort((a, b) => a.name.localeCompare(b.name));
+            // Sort by numeric value in plan name instead of alphabetical
+            pairs.sort((a, b) => {
+              // Extract numeric values from plan names
+              const aMatch = a.name.match(/(\d+(?:,\d+)?)/);
+              const bMatch = b.name.match(/(\d+(?:,\d+)?)/);
+              
+              if (aMatch && bMatch) {
+                // Convert to numeric values, removing commas
+                const aValue = parseInt(aMatch[1].replace(/,/g, ''));
+                const bValue = parseInt(bMatch[1].replace(/,/g, ''));
+                
+                // Sort numerically
+                return aValue - bValue;
+              }
+              
+              // Fallback to alphabetical sort if no numbers found
+              return a.name.localeCompare(b.name);
+            });
             
             // Update the arrays with sorted values
             dataByType[type].plans[carrier].planNames = pairs.map(p => p.name);
