@@ -331,6 +331,21 @@ export const submitToAirtable = async (formData: FormData) => {
       }
     };
     
+    // Add special debug for addon fields
+    console.log('DEBUG ADDON FIELDS:');
+    console.log('American Financial Plans:', {
+      plan1: formData.insuranceDetails?.americanFinancial1Plan,
+      plan2: formData.insuranceDetails?.americanFinancial2Plan,
+      plan3: formData.insuranceDetails?.americanFinancial3Plan,
+    });
+    console.log('AMT Plans:', {
+      plan1: formData.insuranceDetails?.amt1Plan,
+      plan2: formData.insuranceDetails?.amt2Plan,
+    });
+    console.log('Leo Addons:', {
+      plans: formData.insuranceDetails?.leoAddonsPlans,
+    });
+    
     console.log('Debug - Key Currency Fields:', debugCurrencyFields);
     console.log('Form Data (insuranceDetails):', formData.insuranceDetails);
     
@@ -354,6 +369,20 @@ export const submitToAirtable = async (formData: FormData) => {
     
     // Log the payload for debugging
     console.log('Submitting to Airtable with data:', JSON.stringify(airtableRecord, null, 2));
+    
+    // Enhanced debugging for American Financial, AMT, and Essential Care fields
+    console.log('DEBUGGING PROBLEMATIC FIELDS:');
+    console.log('American Financial 1 Premium:', airtableRecord.fields['American Financial 1 Premium'] || 'NOT SET');
+    console.log('American Financial 1 Commission:', airtableRecord.fields['American Financial 1 Commission'] || 'NOT SET');
+    console.log('American Financial 2 Premium:', airtableRecord.fields['American Financial 2 Premium'] || 'NOT SET');
+    console.log('American Financial 2 Commission:', airtableRecord.fields['American Financial 2 Commission'] || 'NOT SET');
+    console.log('American Financial 3 Premium:', airtableRecord.fields['American Financial 3 Premium'] || 'NOT SET');
+    console.log('American Financial 3 Commission:', airtableRecord.fields['American Financial 3 Commission'] || 'NOT SET');
+    console.log('AMT 1 Commission:', airtableRecord.fields['AMT 1 Commission'] || 'NOT SET');
+    console.log('AMT 2 Commission:', airtableRecord.fields['AMT 2 Commission'] || 'NOT SET');
+    console.log('Essential Care Premium:', airtableRecord.fields['Essential Care Premium'] || 'NOT SET');
+    console.log('Essential Care Commission:', airtableRecord.fields['Essential Care Commission'] || 'NOT SET');
+    console.log('Total Premium:', airtableRecord.fields['Total Premium'] || 'NOT SET');
     
     const response = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`, {
       method: 'POST',

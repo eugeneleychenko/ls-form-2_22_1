@@ -388,21 +388,12 @@ export default function InsuranceDetails() {
               // Handle commission values properly
               let planCommission = "0";
               if (record.fields[planCommissionKey]) {
-                const rawCommission = record.fields[planCommissionKey];
-                // Convert commission to string, handling different formats
-                if (typeof rawCommission === 'number') {
-                  // If it's a decimal (e.g., 0.3), it's already in proper format
-                  planCommission = String(rawCommission);
-                  console.log(`Commission for ${planName} (decimal): ${planCommission}`);
-                } else if (typeof rawCommission === 'string') {
-                  // If it's a string, preserve it - could be percentage or decimal
-                  planCommission = rawCommission;
-                  console.log(`Commission for ${planName} (string): ${planCommission}`);
-                } else {
-                  console.warn(`Unknown commission type for ${planName}: ${typeof rawCommission}`);
+                const commissionValue = record.fields[planCommissionKey];
+                if (typeof commissionValue === 'string') {
+                  planCommission = commissionValue.replace(/\$+/g, '').trim();
+                } else if (typeof commissionValue === 'number') {
+                  planCommission = commissionValue.toString();
                 }
-              } else {
-                console.warn(`No commission found for ${planName}, using default 0.3`);
               }
               
               // Check if the plan is available in the selected state
@@ -575,16 +566,11 @@ export default function InsuranceDetails() {
                 if (typeof rawCommission === 'number') {
                   // If it's a decimal (e.g., 0.3), it's already in proper format
                   planCommission = String(rawCommission);
-                  console.log(`Commission for ${planName} (decimal): ${planCommission}`);
                 } else if (typeof rawCommission === 'string') {
-                  // If it's a string, preserve it - could be percentage or decimal
-                  planCommission = rawCommission;
-                  console.log(`Commission for ${planName} (string): ${planCommission}`);
-                } else {
-                  console.warn(`Unknown commission type for ${planName}: ${typeof rawCommission}`);
+                  // If it's a string, clean it
+                  const cleaned = rawCommission.replace(/[^0-9.]/g, '');
+                  planCommission = cleaned || "0.3"; // Use default if parsing fails
                 }
-              } else {
-                console.warn(`No commission found for ${planName}, using default 0.3`);
               }
               
               // Log commission info for debugging
@@ -628,53 +614,20 @@ export default function InsuranceDetails() {
         for (const type in dataByType) {
           dataByType[type].carriers.sort();
           
-          // DO NOT sort plans alphabetically - preserve the original order from Airtable
+          // Sort plans for each carrier
           for (const carrier in dataByType[type].plans) {
-            // Create pairs of plan names, costs, and commissions with their original index
-            interface PlanInfo {
-              name: string;
-              cost: string;
-              commission: string;
-              originalIndex: number;
-            }
-            
-            const pairs: PlanInfo[] = dataByType[type].plans[carrier].planNames.map((name, idx) => ({
+            // Create pairs of plan names and costs for sorting
+            const pairs = dataByType[type].plans[carrier].planNames.map((name, index) => ({
               name,
-              cost: dataByType[type].plans[carrier].planCosts[idx],
-              commission: dataByType[type].plans[carrier].planCommissions[idx],
-              originalIndex: idx // Keep track of original position
+              cost: dataByType[type].plans[carrier].planCosts[index]
             }));
             
-            // Sort by the plan number if possible (extract number from plan name)
-            pairs.sort((a: PlanInfo, b: PlanInfo) => {
-              // Try to extract plan numbers (e.g., "Premier 100", "Premier 200", etc.)
-              const aMatch = a.name.match(/(\d+)/);
-              const bMatch = b.name.match(/(\d+)/);
-              
-              if (aMatch && bMatch) {
-                const aNum = parseInt(aMatch[1], 10);
-                const bNum = parseInt(bMatch[1], 10);
-                
-                // Sort by numeric value if both have numbers
-                if (!isNaN(aNum) && !isNaN(bNum)) {
-                  return aNum - bNum;
-                }
-              }
-              
-              // If we can't extract numbers, preserve original order
-              return a.originalIndex - b.originalIndex;
-            });
+            // Sort by plan name
+            pairs.sort((a, b) => a.name.localeCompare(b.name));
             
-            // Update the arrays with sorted values, preserving all data
+            // Update the arrays with sorted values
             dataByType[type].plans[carrier].planNames = pairs.map(p => p.name);
             dataByType[type].plans[carrier].planCosts = pairs.map(p => p.cost);
-            dataByType[type].plans[carrier].planCommissions = pairs.map(p => p.commission);
-            
-            // Log the sorted plans for debugging
-            console.log(`Sorted plans for ${carrier} (${type}):`);
-            pairs.forEach((p, i) => {
-              console.log(`  ${i+1}. ${p.name} - Commission: ${p.commission}`);
-            });
           }
         }
         
@@ -938,64 +891,62 @@ export default function InsuranceDetails() {
     }
     
     const cost = planCosts[planName] || "";
-    // Get commission rate with fallback to default
-    const rawCommissionRate = planCommissions[planName] || "0.3"; 
+    let commissionRate = planCommissions[planName] || "30"; // Default to 30% if not found
     
     // Log commission data for debugging
     console.log(`🔍 Commission Debug for ${planName}:`, {
-      rawRate: rawCommissionRate,
-      type: typeof rawCommissionRate
+      rawRate: commissionRate,
+      type: typeof commissionRate
     });
     
     // Ensure commission rate is a valid number by parsing it properly
-    let parsedCommissionRate: number = 0.3; // Default value
-    let displayCommissionRate: string = "30%"; // Default display value
+    let parsedCommissionRate: number;
     
-    // Convert the commission rate to a decimal number for calculations
-    if (typeof rawCommissionRate === 'string') {
+    // Handle different commission rate formats (decimal, percentage, or string)
+    if (typeof commissionRate === 'string') {
       // If it's a string, check if it's decimal format (0.3) or percentage (30)
-      const cleaned = rawCommissionRate.replace(/[^0-9.]/g, '');
+      const cleaned = commissionRate.replace(/[^0-9.]/g, '');
       const value = parseFloat(cleaned);
       
       if (!isNaN(value)) {
         if (value <= 1) {
           // It's in decimal format (0.3 for 30%)
-          parsedCommissionRate = value;
-          displayCommissionRate = `${(value * 100).toFixed(0)}%`;
-          console.log(`  Decimal format detected: ${value} → ${parsedCommissionRate * 100}%`);
+          parsedCommissionRate = value * 100;
+          commissionRate = parsedCommissionRate.toString();
+          console.log(`  Decimal format detected: ${value} → ${parsedCommissionRate}%`);
         } else {
           // It's already a percentage (30 for 30%)
-          parsedCommissionRate = value / 100;
-          displayCommissionRate = `${value}%`;
+          parsedCommissionRate = value;
+          commissionRate = value.toString();
           console.log(`  Percentage format detected: ${value}%`);
         }
       } else {
         // Invalid format, use 30% as default
-        parsedCommissionRate = 0.3;
-        displayCommissionRate = "30%";
-        console.error(`  ⚠️ Invalid commission format: "${rawCommissionRate}" - using 30% default`);
+        parsedCommissionRate = 30;
+        commissionRate = "30";
+        console.error(`  ⚠️ Invalid commission format: "${commissionRate}" - using 30% default`);
       }
-    } else if (typeof rawCommissionRate === 'number') {
+    } else if (typeof commissionRate === 'number') {
       // If it's already a number, check if it's decimal or percentage
-      if (rawCommissionRate <= 1) {
-        parsedCommissionRate = rawCommissionRate;
-        displayCommissionRate = `${(rawCommissionRate * 100).toFixed(0)}%`;
+      if (commissionRate <= 1) {
+        parsedCommissionRate = commissionRate * 100;
+        commissionRate = parsedCommissionRate.toString();
       } else {
-        parsedCommissionRate = rawCommissionRate / 100;
-        displayCommissionRate = `${rawCommissionRate}%`;
+        parsedCommissionRate = commissionRate;
+        commissionRate = commissionRate.toString();
       }
     } else {
       // If it's neither string nor number, default to 30%
-      parsedCommissionRate = 0.3;
-      displayCommissionRate = "30%";
-      console.error(`  ⚠️ Unknown commission format: ${typeof rawCommissionRate} - using 30% default`);
+      parsedCommissionRate = 30;
+      commissionRate = "30";
+      console.error(`  ⚠️ Unknown commission format: ${typeof commissionRate} - using 30% default`);
     }
     
     // Commission rates should always come from Airtable, but use default if missing
     if (parsedCommissionRate === 0) {
       console.warn(`  ⚠️ Zero commission rate found - using 30% default`);
-      parsedCommissionRate = 0.3;
-      displayCommissionRate = "30%";
+      parsedCommissionRate = 30;
+      commissionRate = "30";
       toast.warning(`No commission rate found for ${planName}. Using 30% default.`);
     }
     
@@ -1020,13 +971,17 @@ export default function InsuranceDetails() {
     const addonsCostValue = parseFloat(addonsTotalCost.replace(/[^0-9.]/g, '') || "0");
     
     // Calculate commission as a dollar amount
-    let calculatedCommission = `$${(parsedCommissionRate * costValue).toFixed(2)}`;
+    let calculatedCommission = `$${(parseFloat(commissionRate) * 0.01 * costValue).toFixed(2)}`;
+    let displayRate = commissionRate + "%";
     
     // Calculate first month premium (cost + enrollment fee + add-ons)
     const firstMonthPremium = costValue + enrollmentFeeValue + addonsCostValue;
     
     // Calculate monthly premium (cost + add-ons)
     const monthlyPremium = costValue + addonsCostValue;
+    
+    // Calculate total premium (for Airtable)
+    const totalPremium = costValue + addonsCostValue;
     
     // Update first month premium breakdown for tooltip
     const firstMonthBreakdownItems = [
@@ -1050,19 +1005,21 @@ export default function InsuranceDetails() {
     setFirstMonthBreakdown(firstMonthBreakdownItems);
     
     console.log("Setting plan cost to:", formattedCost);
-    console.log("Commission rate:", displayCommissionRate);
+    console.log("Commission rate:", commissionRate);
     console.log("Calculated commission:", calculatedCommission);
     console.log("Enrollment fee:", `$${enrollmentFee}`);
     console.log("First month premium:", `$${firstMonthPremium.toFixed(2)}`);
     console.log("Monthly premium:", `$${monthlyPremium.toFixed(2)}`);
+    console.log("Total premium:", `$${totalPremium.toFixed(2)}`);
     
     setValue("insuranceDetails.planCost", formattedCost);
-    setValue("insuranceDetails.commissionRate", displayCommissionRate);
+    setValue("insuranceDetails.commissionRate", displayRate);
     setValue("insuranceDetails.planCommission", calculatedCommission);
     setValue("insuranceDetails.enrollmentFee", `$${enrollmentFee}`);
     setValue("insuranceDetails.enrollmentFeeCommission", `$${enrollmentCommission.toFixed(2)}`);
     setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
     setValue("insuranceDetails.monthlyPremium", `$${monthlyPremium.toFixed(2)}`);
+    setValue("insuranceDetails.totalPremium", `$${totalPremium.toFixed(2)}`);
     setPlanCommission(calculatedCommission);
     
     // Calculate total commission
@@ -1097,6 +1054,41 @@ export default function InsuranceDetails() {
 
   // Handle addon selection for radio buttons (original providers)
   const handleAddonSelectionRadio = (provider: string, addonName: string) => {
+    // Debug log
+    console.log(`handleAddonSelectionRadio called with provider=${provider}, addonName=${addonName}`);
+    
+    // Special handling for Essential Care Individual
+    if (provider === "Essential Care Individual") {
+      console.log("Processing Essential Care Individual addon:", addonName);
+      
+      // Find the addon details
+      const addon = availableAddons.find(a => a.planName === addonName && a.provider === "Essential Care Individual");
+      if (addon) {
+        // Extract premium
+        const premiumValue = parseFloat(addon.planCost.replace(/[^0-9.]/g, ''));
+        let commissionValue = 0;
+        
+        // Calculate commission
+        const commissionRate = parseFloat(addon.planCommission.replace(/[^0-9.]/g, ''));
+        if (!isNaN(commissionRate) && !isNaN(premiumValue)) {
+          if (commissionRate <= 1) {
+            commissionValue = premiumValue * commissionRate;
+          } else {
+            commissionValue = premiumValue * (commissionRate / 100);
+          }
+        }
+        
+        // Set Essential Care values
+        setValue("insuranceDetails.essentialCarePremium", `$${premiumValue.toFixed(2)}`);
+        setValue("insuranceDetails.essentialCareCommission", `$${commissionValue.toFixed(2)}`);
+        console.log("Set Essential Care values:", {
+          premium: `$${premiumValue.toFixed(2)}`,
+          commission: `$${commissionValue.toFixed(2)}`
+        });
+      }
+    }
+    
+    // Call the normal handler
     handleAddonSelection(provider, addonName, true);
   };
 
@@ -1129,18 +1121,208 @@ export default function InsuranceDetails() {
     setValue("insuranceDetails.addonsCommission", totalCommission);
     
     // Special handling for American Financial
-    if (provider === "American Financial") {
+    if (provider.startsWith("American Financial")) {
       const americanFinancialAddons = updatedAddons.filter(addon => 
-        addon.startsWith("American Financial:")
+        addon.startsWith("American Financial")
       );
       
       if (americanFinancialAddons.length > 0) {
-        // ... existing American Financial code ...
+        // Get the addon names without the provider prefix
+        const afAddons = americanFinancialAddons.map(addon => addon.split(':')[1]);
+        
+        // Set American Financial plan values in form
+        setValue("insuranceDetails.americanFinancialPlans", afAddons.join(", "));
+        
+        // Set individual American Financial plans (up to 3)
+        if (afAddons[0]) {
+          setValue("insuranceDetails.americanFinancial1Plan", afAddons[0]);
+          
+          // Find the addon to get its premium and commission
+          const addon1 = availableAddons.find(a => 
+            a.planName === afAddons[0] && 
+            a.provider && a.provider.startsWith("American Financial")
+          );
+          
+          if (addon1) {
+            const premium1 = parseFloat(addon1.planCost.replace(/[^0-9.]/g, ''));
+            let commission1 = 0;
+            
+            // Calculate commission
+            const commissionValue = parseFloat(addon1.planCommission.replace(/[^0-9.]/g, ''));
+            if (!isNaN(commissionValue)) {
+              if (commissionValue <= 1) {
+                commission1 = premium1 * commissionValue;
+              } else {
+                commission1 = premium1 * (commissionValue / 100);
+              }
+            }
+            
+            setValue("insuranceDetails.americanFinancial1Premium", `$${premium1.toFixed(2)}`);
+            setValue("insuranceDetails.americanFinancial1Commission", `$${commission1.toFixed(2)}`);
+          }
+        }
+        
+        if (afAddons[1]) {
+          setValue("insuranceDetails.americanFinancial2Plan", afAddons[1]);
+          
+          // Find the addon to get its premium and commission
+          const addon2 = availableAddons.find(a => 
+            a.planName === afAddons[1] && 
+            a.provider && a.provider.startsWith("American Financial")
+          );
+          
+          if (addon2) {
+            const premium2 = parseFloat(addon2.planCost.replace(/[^0-9.]/g, ''));
+            let commission2 = 0;
+            
+            // Calculate commission
+            const commissionValue = parseFloat(addon2.planCommission.replace(/[^0-9.]/g, ''));
+            if (!isNaN(commissionValue)) {
+              if (commissionValue <= 1) {
+                commission2 = premium2 * commissionValue;
+              } else {
+                commission2 = premium2 * (commissionValue / 100);
+              }
+            }
+            
+            setValue("insuranceDetails.americanFinancial2Premium", `$${premium2.toFixed(2)}`);
+            setValue("insuranceDetails.americanFinancial2Commission", `$${commission2.toFixed(2)}`);
+          }
+        }
+        
+        if (afAddons[2]) {
+          setValue("insuranceDetails.americanFinancial3Plan", afAddons[2]);
+          
+          // Find the addon to get its premium and commission
+          const addon3 = availableAddons.find(a => 
+            a.planName === afAddons[2] && 
+            a.provider && a.provider.startsWith("American Financial")
+          );
+          
+          if (addon3) {
+            const premium3 = parseFloat(addon3.planCost.replace(/[^0-9.]/g, ''));
+            let commission3 = 0;
+            
+            // Calculate commission
+            const commissionValue = parseFloat(addon3.planCommission.replace(/[^0-9.]/g, ''));
+            if (!isNaN(commissionValue)) {
+              if (commissionValue <= 1) {
+                commission3 = premium3 * commissionValue;
+              } else {
+                commission3 = premium3 * (commissionValue / 100);
+              }
+            }
+            
+            setValue("insuranceDetails.americanFinancial3Premium", `$${premium3.toFixed(2)}`);
+            setValue("insuranceDetails.americanFinancial3Commission", `$${commission3.toFixed(2)}`);
+          }
+        }
       } else {
         // Clear American Financial values if none selected
         setValue("insuranceDetails.americanFinancialPlans", "");
         setValue("insuranceDetails.americanFinancialPremium", "");
         setValue("insuranceDetails.americanFinancialCommission", "");
+        setValue("insuranceDetails.americanFinancial1Plan", "");
+        setValue("insuranceDetails.americanFinancial2Plan", "");
+        setValue("insuranceDetails.americanFinancial3Plan", "");
+      }
+    }
+    
+    // Special handling for AMT
+    else if (provider.startsWith("AMT")) {
+      const amtAddons = updatedAddons.filter(addon => 
+        addon.startsWith("AMT")
+      );
+      
+      if (amtAddons.length > 0) {
+        // Get the addon names without the provider prefix
+        const amtAddonNames = amtAddons.map(addon => addon.split(':')[1]);
+        
+        // Set AMT plan values in form
+        setValue("insuranceDetails.amtPlans", amtAddonNames.join(", "));
+        
+        // Set individual AMT plans (up to 2)
+        if (amtAddonNames[0]) setValue("insuranceDetails.amt1Plan", amtAddonNames[0]);
+        if (amtAddonNames[1]) setValue("insuranceDetails.amt2Plan", amtAddonNames[1]);
+        
+        // Get and set premiums and commissions
+        let amt1Premium = 0;
+        let amt1Commission = 0;
+        let amt2Premium = 0;
+        let amt2Commission = 0;
+        
+        if (amtAddonNames[0]) {
+          const amt1Addon = availableAddons.find(a => 
+            a.planName === amtAddonNames[0] && 
+            a.provider && a.provider.startsWith("AMT")
+          );
+          if (amt1Addon) {
+            // Add premium
+            const premiumValue = parseFloat(amt1Addon.planCost.replace(/[^0-9.]/g, ''));
+            if (!isNaN(premiumValue)) {
+              amt1Premium = premiumValue;
+            }
+            
+            // Add commission
+            const commissionValue = parseFloat(amt1Addon.planCommission.replace(/[^0-9.]/g, ''));
+            if (!isNaN(commissionValue)) {
+              // If commission is a percentage, calculate the actual value
+              if (commissionValue <= 1) {
+                amt1Commission = premiumValue * commissionValue;
+              } else {
+                amt1Commission = premiumValue * (commissionValue / 100);
+              }
+            }
+          }
+        }
+        
+        if (amtAddonNames[1]) {
+          const amt2Addon = availableAddons.find(a => 
+            a.planName === amtAddonNames[1] && 
+            a.provider && a.provider.startsWith("AMT")
+          );
+          if (amt2Addon) {
+            // Add premium
+            const premiumValue = parseFloat(amt2Addon.planCost.replace(/[^0-9.]/g, ''));
+            if (!isNaN(premiumValue)) {
+              amt2Premium = premiumValue;
+            }
+            
+            // Add commission
+            const commissionValue = parseFloat(amt2Addon.planCommission.replace(/[^0-9.]/g, ''));
+            if (!isNaN(commissionValue)) {
+              // If commission is a percentage, calculate the actual value
+              if (commissionValue <= 1) {
+                amt2Commission = premiumValue * commissionValue;
+              } else {
+                amt2Commission = premiumValue * (commissionValue / 100);
+              }
+            }
+          }
+        }
+        
+        // Set individual values for AMT plans
+        setValue("insuranceDetails.amt1Premium", amt1Premium > 0 ? `$${amt1Premium.toFixed(2)}` : "");
+        setValue("insuranceDetails.amt1Commission", amt1Commission > 0 ? `$${amt1Commission.toFixed(2)}` : "");
+        setValue("insuranceDetails.amt2Premium", amt2Premium > 0 ? `$${amt2Premium.toFixed(2)}` : "");
+        setValue("insuranceDetails.amt2Commission", amt2Commission > 0 ? `$${amt2Commission.toFixed(2)}` : "");
+        
+        // Set total values for AMT
+        const totalPremium = amt1Premium + amt2Premium;
+        const totalCommission = amt1Commission + amt2Commission;
+        setValue("insuranceDetails.amtPremium", `$${totalPremium.toFixed(2)}`);
+        setValue("insuranceDetails.amtCommission", `$${totalCommission.toFixed(2)}`);
+      } else {
+        // Clear AMT values if none selected
+        setValue("insuranceDetails.amtPlans", "");
+        setValue("insuranceDetails.amtPremium", "");
+        setValue("insuranceDetails.amtCommission", "");
+        setValue("insuranceDetails.amt1Plan", "");
+        setValue("insuranceDetails.amt1Premium", "");
+        setValue("insuranceDetails.amt1Commission", "");
+        setValue("insuranceDetails.amt2Plan", "");
+        setValue("insuranceDetails.amt2Premium", "");
+        setValue("insuranceDetails.amt2Commission", "");
       }
     }
     
@@ -1193,7 +1375,10 @@ export default function InsuranceDetails() {
       
       leoAddons.forEach(addonIdentifier => {
         const addonName = addonIdentifier.split(":")[1];
-        const addon = availableAddons.find(a => a.planName === addonName && a.provider === "Leo Addons");
+        const addon = availableAddons.find(a => 
+          a.planName === addonName && 
+          a.provider === "Leo Addons"
+        );
         
         if (addon) {
           // Add to list of Leo plans
@@ -1206,8 +1391,13 @@ export default function InsuranceDetails() {
           }
           
           // Add commission
-          const commissionValue = parseFloat(addon.planCommission.replace(/[^0-9.]/g, ''));
+          let commissionValue = parseFloat(addon.planCommission.replace(/[^0-9.]/g, ''));
           if (!isNaN(commissionValue)) {
+            // Override commission for Telemedicine+Rx to be 0.8 (80%)
+            if (addonName === "Telemedicine+Rx $109.95") {
+              commissionValue = 0.8;
+            }
+            
             // If commission is a percentage, calculate the actual value
             if (commissionValue <= 1) {
               totalLeoCommission += premiumValue * commissionValue;
@@ -1237,11 +1427,35 @@ export default function InsuranceDetails() {
   };
   
   // Calculate total cost and commission of selected addons
-  const calculateAddonsValues = (selectedAddons: string[]): { totalCost: string, totalCommission: string } => { // [X] Updated return type
+  const calculateAddonsValues = (selectedAddons: string[]): { totalCost: string, totalCommission: string } => {
+    
+    // Debug at the start of the function
+    console.log("calculateAddonsValues called with:", selectedAddons);
+    
     let totalCost = 0;
-    let totalCommission = 0; // [X] Added commission total
+    let totalCommission = 0;
     const costBreakdown: { label: string; value: string }[] = [];
     const commissionBreakdown: { label: string; value: string }[] = [];
+    
+    // Add debug logging for American Financial, AMT, and Essential Care fields
+    console.log("DEBUG BEFORE SUBMISSION - Form Values:", {
+      americanFinancial1Plan: watch("insuranceDetails.americanFinancial1Plan"),
+      americanFinancial1Premium: watch("insuranceDetails.americanFinancial1Premium"),
+      americanFinancial1Commission: watch("insuranceDetails.americanFinancial1Commission"),
+      americanFinancial2Plan: watch("insuranceDetails.americanFinancial2Plan"),
+      americanFinancial2Premium: watch("insuranceDetails.americanFinancial2Premium"),
+      americanFinancial2Commission: watch("insuranceDetails.americanFinancial2Commission"),
+      americanFinancial3Plan: watch("insuranceDetails.americanFinancial3Plan"),
+      americanFinancial3Premium: watch("insuranceDetails.americanFinancial3Premium"),
+      americanFinancial3Commission: watch("insuranceDetails.americanFinancial3Commission"),
+      amt1Plan: watch("insuranceDetails.amt1Plan"),
+      amt1Commission: watch("insuranceDetails.amt1Commission"),
+      amt2Plan: watch("insuranceDetails.amt2Plan"),
+      amt2Commission: watch("insuranceDetails.amt2Commission"),
+      essentialCarePremium: watch("insuranceDetails.essentialCarePremium"),
+      essentialCareCommission: watch("insuranceDetails.essentialCareCommission"),
+      totalPremium: watch("insuranceDetails.totalPremium")
+    });
     
     selectedAddons.forEach(selectedAddon => {
       // Parse the addon identifier (provider:name or just name)
@@ -1257,10 +1471,25 @@ export default function InsuranceDetails() {
       }
       
       // Find the addon in availableAddons
-      const addon = availableAddons.find(a => 
-        a.planName === addonName && 
-        (!addonProvider || a.provider === addonProvider)
-      );
+      const addon = availableAddons.find(a => {
+        // First check exact plan name match
+        if (a.planName === addonName) {
+          // If provider is specified, check for exact or partial provider match
+          if (addonProvider) {
+            // For American Financial and AMT, do partial prefix matching
+            if (addonProvider.startsWith("American Financial") && a.provider.startsWith("American Financial")) {
+              return true;
+            }
+            if (addonProvider.startsWith("AMT") && a.provider.startsWith("AMT")) {
+              return true;
+            }
+            // For other providers, check exact match
+            return a.provider === addonProvider;
+          }
+          return true;
+        }
+        return false;
+      });
       
       if (addon) {
         // Extract the cost value (remove $ and convert to number)
@@ -1350,7 +1579,7 @@ export default function InsuranceDetails() {
   };
   
   // [X] Calculate total commission (plan + addons)
-  const calculateTotalCommission = (planCommissionValue: string, selectedAddons: string[]): void => {
+  const calculateTotalCommission = (planCommissionValue: string, selectedAddons: string[]) => {
     // Extract plan commission value
     const planCommissionNumber = parseFloat(planCommissionValue.replace(/[^0-9.]/g, '') || "0");
     
@@ -1440,6 +1669,10 @@ export default function InsuranceDetails() {
     // Update first month premium (plan + enrollment + add-ons)
     const firstMonthPremium = planCostValue + enrollmentFeeValue + addonsCostValue;
     setValue("insuranceDetails.firstMonthPremium", `$${firstMonthPremium.toFixed(2)}`);
+    
+    // Calculate and set Total Premium (this is what Airtable expects)
+    const totalPremium = planCostValue + addonsCostValue;
+    setValue("insuranceDetails.totalPremium", `$${totalPremium.toFixed(2)}`);
     
     // Update first month premium breakdown
     const firstMonthBreakdownItems = [

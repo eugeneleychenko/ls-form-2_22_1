@@ -147,6 +147,31 @@ if (require.main === module) {
       const firstName = latestSubmission.fields['firstName'] || 'N/A';
       const lastName = latestSubmission.fields['lastName'] || 'N/A';
       console.log(`Lead ID: ${leadId}, Name: ${firstName} ${lastName}`);
+      
+      // Print all fields for detailed inspection
+      console.log('\n=== DETAILED FIELD INSPECTION ===');
+      console.log('Checking for American Financial and AMT fields:');
+      const fields = latestSubmission.fields;
+      
+      console.log('\nAmerican Financial Plans:');
+      console.log('American Financial Plan 1:', fields['American Financial Plan 1'] || 'Not Found');
+      console.log('American Financial Plan 2:', fields['American Financial Plan 2'] || 'Not Found');
+      console.log('American Financial Plan 3:', fields['American Financial Plan 3'] || 'Not Found');
+      
+      console.log('\nAMT Plans:');
+      console.log('AMT 1:', fields['AMT 1'] || 'Not Found');
+      console.log('AMT 2:', fields['AMT 2'] || 'Not Found');
+      console.log('AMT 1 Premium:', fields['AMT 1 Premium'] || 'Not Found');
+      console.log('AMT 2 Premium:', fields['AMT 2 Premium'] || 'Not Found');
+      
+      console.log('\nLeo Addons:');
+      console.log('Leo Addons:', fields['Leo Addons'] || 'Not Found');
+      console.log('Leo Addons Commissions:', fields['Leo Addons Commissions'] || 'Not Found');
+      
+      console.log('\nAll submission fields:');
+      Object.keys(fields).sort().forEach(key => {
+        console.log(`${key}: ${fields[key]}`);
+      });
     } else {
       console.log('No submission found');
     }
